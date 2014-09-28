@@ -2,6 +2,7 @@
 #include "nRF24L01.h"
 #include "RF24.h"
 #include "AESLib.h"
+#include "printf.h"
 
 // "Hhno91h7man80azy"
 uint8_t key[] = { 25, 123, 90, 174, 198, 145, 40, 33, 98, 90, 90, 111, 78, 65, 184, 188 };
@@ -18,7 +19,8 @@ const uint8_t MESSAGE_REGISTER_ACK = 1;
 
 
 void setup() {
-  Serial.begin(9600);
+  Serial.begin(57600);
+  printf_begin();
   setupRadio();
   registerWithServer();
 }
@@ -28,13 +30,14 @@ void loop() {
 
 void setupRadio() {
   radio.begin();
-  radio.setRetries(10, 25);
-  radio.setPALevel(RF24_PA_LOW);
+  radio.setRetries(15, 15);
+  radio.setPALevel(RF24_PA_MIN);
   radio.setChannel(0x4c);
   radio.setDataRate(RF24_1MBPS);
   radio.setCRCLength(RF24_CRC_16);
   radio.openWritingPipe(serverAddress);
   radio.openReadingPipe(1, listenAddress);
+  radio.startListening();
   radio.printDetails();
 }
 
@@ -47,16 +50,20 @@ void registerWithServer() {
   
   while (!registered) {
     Serial.print("Registering: ");
-    sendPacket(MESSAGE_REGISTER, payload, 8);
-    if (!waitForPacket(MESSAGE_REGISTER_ACK, received)) {
-      Serial.print("Failed;\n");
-      delay(5000);
+    if (!sendPacket(MESSAGE_REGISTER, payload, 8)) {
+        Serial.print("Failed sending packet;\n");
+        delay(5000);
     } else {
-      clientId = (uint8_t)received[1];
-      Serial.print("Success; ClientId: ");
-      Serial.print(clientId);
-      Serial.print(";\n");
-      registered = true;
+        if (!waitForPacket(MESSAGE_REGISTER_ACK, received)) {
+          Serial.print("Failed;\n");
+          delay(5000);
+        } else {
+          clientId = (uint8_t)received[1];
+          Serial.print("Success; ClientId: ");
+          Serial.print(clientId);
+          Serial.print(";\n");
+          registered = true;
+        }
     }
   }
 }
@@ -90,7 +97,7 @@ bool sendPacket(uint8_t type, char* payload, uint8_t payloadSize) {
   memcpy(&data[4], &payload, payloadSize);
   counter++;
 
-  Serial.print("Sending: ");
+  Serial.print("Sending Before: ");
     Serial.print(counter);
     Serial.print(": ");
     for (int i = 0; i < 32; i++) {
@@ -110,16 +117,16 @@ bool sendPacket(uint8_t type, char* payload, uint8_t payloadSize) {
 
 void encryptPayload(char* data) {
   aes128_enc_single(key, data);
-  aes128_enc_single(key, data + 16);
   for (int i = 0; i < 16; i++) {
-    data[16+i] = data[16+i] ^ data[i];  
+      data[16+i] = data[16+i] ^ data[i];
   }
+  aes128_enc_single(key, data + 16);
 }
 
 void decryptPayload(char* data) {
-  for (int i = 0; i < 16; i++) {
-    data[16+i] = data[16+i] ^ data[i];  
-  }
   aes128_dec_single(key, data + 16);
+  for (int i = 0; i < 16; i++) {
+      data[16+i] = data[16+i] ^ data[i];
+  }
   aes128_dec_single(key, data);  
 }

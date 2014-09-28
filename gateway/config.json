@@ -1,9 +1,0 @@
-{
-    "preSharedKey": [ 25, 123, 90, 174, 198, 145, 40, 33, 98, 90, 90, 111, 78, 65, 184, 188 ],
-    "radio": {
-        "listen": "0xF0F0F0F0E1",
-        "spiDev": "/dev/spidev0.0",
-        "cePin": 24,
-        "irqPin": 25
-    }
-}
