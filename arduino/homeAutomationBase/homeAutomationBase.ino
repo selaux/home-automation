@@ -5,13 +5,13 @@
 #include "printf.h"
 
 // "Hhno91h7man80azy"
-uint8_t key[] = { 25, 123, 90, 174, 198, 145, 40, 33, 98, 90, 90, 111, 78, 65, 184, 188 };
+const uint8_t key[] = { 25, 123, 90, 174, 198, 145, 40, 33, 98, 90, 90, 111, 78, 65, 184, 188 };
 uint8_t counter = 0;
 
 RF24 radio(9, 10);
 const uint64_t serverAddress = 0xF0F0F0F0E1LL;
 
-const uint64_t listenAddress = 0xF0F0F0F1E1LL;
+uint64_t listenAddress = 0xF0F0F0F0D2LL;
 uint8_t clientId = 0;
 
 const uint8_t MESSAGE_REGISTER = 0;
@@ -31,10 +31,11 @@ void loop() {
 void setupRadio() {
   radio.begin();
   radio.setRetries(15, 15);
-  radio.setPALevel(RF24_PA_MIN);
+  radio.setPALevel(RF24_PA_LOW);
   radio.setChannel(0x4c);
   radio.setDataRate(RF24_1MBPS);
   radio.setCRCLength(RF24_CRC_16);
+  radio.setPayloadSize(32);
   radio.openWritingPipe(serverAddress);
   radio.openReadingPipe(1, listenAddress);
   radio.startListening();
@@ -58,7 +59,7 @@ void registerWithServer() {
           Serial.print("Failed;\n");
           delay(5000);
         } else {
-          clientId = (uint8_t)received[1];
+          clientId = (uint8_t)received[4];
           Serial.print("Success; ClientId: ");
           Serial.print(clientId);
           Serial.print(";\n");
@@ -72,19 +73,25 @@ bool waitForPacket(uint8_t type, char* data) {
   unsigned long started_waiting_at = millis();
   bool timeout = false;
   bool correctPacket = false;
+  bool available = false;
   
-  
-  while (!correctPacket  && !timeout) {
-    while ( !radio.available() && !timeout ) {
-      timeout = millis() - started_waiting_at > 500;
-    }
-    if (radio.available()) {
+  Serial.print("Waiting: ");
+  while (!timeout && !correctPacket) {
+    available = radio.available();
+    if (available) {
+      radio.read( &data[0], 32 );
       decryptPayload(data);
-      radio.read( &data, 32 );
-      correctPacket = (uint8_t)data[2] == type;  
+      Serial.print("Receiving: ");
+        for (int i = 0; i < 32; i++) {
+          Serial.print((uint8_t)data[i], HEX);
+          Serial.print(" ");
+        }
+        Serial.print("\n");
+      correctPacket = (uint8_t)data[2] == type;
     }
+    timeout = millis() - started_waiting_at > 5000;
   }
-  return correctPacket && !timeout;
+  return correctPacket;
 }
 
 bool sendPacket(uint8_t type, char* payload, uint8_t payloadSize) {
@@ -94,7 +101,7 @@ bool sendPacket(uint8_t type, char* payload, uint8_t payloadSize) {
   memcpy(&data[1], &clientId, 1);
   memcpy(&data[2], &type, 1);
   memcpy(&data[3], &payloadSize, 1);
-  memcpy(&data[4], &payload, payloadSize);
+  memcpy(&data[4], &payload[0], (int)payloadSize);
   counter++;
 
   Serial.print("Sending Before: ");
