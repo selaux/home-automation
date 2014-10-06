@@ -60,7 +60,6 @@ def encryptPacket(packet):
 
     return encryptedPart1 + encryptedPart2
 
-@asyncio.coroutine
 def sendPacket(radio, address, packetId, payload):
     payload_size = len(payload)
     packed = struct.pack('BBBB28s', 1, 0, packetId, payload_size, payload)
@@ -68,10 +67,10 @@ def sendPacket(radio, address, packetId, payload):
     radio.stopListening()
     radio.openReadingPipe(1, SERVER_ADDRESS)
     radio.openWritingPipe(address)
-    failed = radio.write(encryptPacket(bytes(packed)))
+    success = radio.write(encryptPacket(bytes(packed)))
     radio.startListening()
-    if failed:
-        print("Failed sending packet (Not really something in the driver is broken)!")
+    if not success:
+        print("Failed sending packet!")
 
 @asyncio.coroutine
 def handle(radio, packet):
