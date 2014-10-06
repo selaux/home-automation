@@ -1,0 +1,10 @@
+language: python
+python:
+  - "3.4"
+install:
+  - "pyvenv ./venv"
+  - "source ./venv/bin/activate"
+  - "pip install -r gateway/requirements.txt"
+  - "pip install -r gateway/dev-requirements.txt"
+script:
+  - "pylint gateway/*.py"
