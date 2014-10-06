@@ -1,10 +1,10 @@
 from nrf24 import NRF24
 from Crypto.Cipher import AES
 import RPi.GPIO as GPIO
-import time
 import atexit
 import struct
 import random
+import asyncio
 
 KEY = bytes([25, 123, 90, 174, 198, 145, 40, 33, 98, 90, 90, 111, 78, 65, 184, 188 ])
 SERVER_ADDRESS = [0xf0, 0xf0, 0xf0, 0xf0, 0xe1]
@@ -60,6 +60,7 @@ def encryptPacket(packet):
 
     return encryptedPart1 + encryptedPart2
 
+@asyncio.coroutine
 def sendPacket(radio, address, packetId, payload):
     payload_size = len(payload)
     packed = struct.pack('BBBB28s', 1, 0, packetId, payload_size, payload)
@@ -72,25 +73,35 @@ def sendPacket(radio, address, packetId, payload):
     if failed:
         print("Failed sending packet (Not really something in the driver is broken)!")
 
+@asyncio.coroutine
 def handle(radio, packet):
     counter, clientId, messageType, payloadSize = struct.unpack('BBBB', packet[:4])
     print("Recieving message type {0} with counter {1}".format(messageType, counter))
     if messageType == 0:
-        time.sleep(0.02)
         address = list(struct.unpack('<BBBBBBBBBBBB20s', packet)[4:12][::-1][3:8])
-        clientId = random.randint(1,254)
-        print("Register {0} as {1}".format(bytes(address), clientId));
+        clientId = random.randint(1, 254)
+        print("Register {0} as {1}".format(bytes(address), clientId))
+        yield from asyncio.sleep(0.02)
         sendPacket(radio, address, 1, bytes([ clientId ]))
 
-if __name__ == "__main__":
+@asyncio.coroutine
+def run():
     initializeGPIO()
     radio = initializeRadio()
 
     while True:
-        while not radio.available([1]):
-            time.sleep(1 / 100)
+        while not radio.available():
+            yield from asyncio.sleep(0.04)
 
         encryptedPacket = []
         radio.read(encryptedPacket, 32)
         message = decryptPacket(encryptedPacket)
-        handle(radio, bytes(message))
+        asyncio.async(handle(radio, bytes(message)))
+
+if __name__ == "__main__":
+    loop = asyncio.get_event_loop()
+    asyncio.async(run())
+    try:
+        loop.run_forever()
+    finally:
+        loop.close()
