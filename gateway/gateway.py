@@ -10,7 +10,9 @@ import asyncio
 
 KEY = bytes([25, 123, 90, 174, 198, 145, 40, 33, 98, 90, 90, 111, 78, 65, 184, 188])
 SERVER_ADDRESS = [0xf0, 0xf0, 0xf0, 0xf0, 0xe1]
+SERVER_ID = [random.randint(0, 255) for dummy in range(8)]
 
+random.seed()
 
 def initialize_gpio():
     """Initialize GPIO (handles pin numbering and cleanup)"""
@@ -34,9 +36,11 @@ def initialize_radio():
     radio.setDataRate(NRF24.BR_1MBPS)
     radio.setPALevel(NRF24.PA_LOW)
     radio.setCRCLength(NRF24.CRC_16)
-    radio.setAutoAck(1)
+    radio.setAutoAck(True)
+    radio.enableAckPayload()
 
     radio.openReadingPipe(1, SERVER_ADDRESS)
+    radio.openWritingPipe(SERVER_ADDRESS)
     radio.startListening()
 
     radio.printDetails()
@@ -71,16 +75,16 @@ def encrypt_packet(packet):
 
     return encrypted_part1 + encrypted_part2
 
-
 def send_packet(radio, address, packet_id, payload):
     """Send packet to an address"""
     payload_size = len(payload)
     packed = struct.pack('BBBB28s', 1, 0, packet_id, payload_size, payload)
+    encrypted = encrypt_packet(bytes(packed))
 
     radio.stopListening()
     radio.openReadingPipe(1, SERVER_ADDRESS)
     radio.openWritingPipe(address)
-    success = radio.write(encrypt_packet(bytes(packed)))
+    success = radio.write(encrypted)
     radio.startListening()
     if not success:
         print("Failed sending packet!")
@@ -96,7 +100,8 @@ def handle(radio, packet):
         client_id = random.randint(1, 254)
         print("Register {0} as {1}".format(bytes(address), client_id))
         yield from asyncio.sleep(0.02)
-        send_packet(radio, address, 1, bytes([client_id]))
+        response = struct.pack('B8s', client_id, bytes(SERVER_ID))
+        send_packet(radio, address, 1, response)
 
 
 @asyncio.coroutine
@@ -104,22 +109,23 @@ def run():
     """Poll for radio messages, decrypt them and pass them to the handler"""
     initialize_gpio()
     radio = initialize_radio()
+    ack_payload = bytes(SERVER_ID)
 
     while True:
-        while not radio.available():
+        if not radio.available():
+            radio.writeAckPayload(1, ack_payload, 8)
             yield from asyncio.sleep(0.04)
-
-        encrypted_packet = []
-        radio.read(encrypted_packet, 32)
-        message = decrypt_packet(encrypted_packet)
-        asyncio.async(handle(radio, bytes(message)))
+        else:
+            encrypted_packet = []
+            radio.read(encrypted_packet, 32)
+            message = decrypt_packet(encrypted_packet)
+            asyncio.async(handle(radio, bytes(message)))
 
 def main():
     """Runs the gateway"""
     loop = asyncio.get_event_loop()
-    asyncio.async(run())
     try:
-        loop.run_forever()
+        loop.run_until_complete(run())
     finally:
         loop.close()
 

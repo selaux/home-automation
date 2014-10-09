@@ -10,6 +10,7 @@ uint8_t counter = 0;
 
 RF24 radio(9, 10);
 const uint64_t serverAddress = 0xF0F0F0F0E1LL;
+uint64_t serverId;
 
 uint64_t listenAddress = 0xF0F0F0F0D2LL;
 uint8_t clientId = 0;
@@ -17,25 +18,35 @@ uint8_t clientId = 0;
 const uint8_t MESSAGE_REGISTER = 0;
 const uint8_t MESSAGE_REGISTER_ACK = 1;
 
+bool registered = false;
 
 void setup() {
   Serial.begin(57600);
   printf_begin();
   setupRadio();
-  registerWithServer();
+  delay(100);
 }
 
 void loop() {
+  char data[4] = { 0x12, 0x11, 0x10, 0x09 };
+  sendPacket(5, data, 4);
+  if (!registered) {
+    registerWithServer();
+  }
+  delay(2500);
 }
 
 void setupRadio() {
   radio.begin();
   radio.setRetries(15, 15);
-  radio.setPALevel(RF24_PA_LOW);
   radio.setChannel(0x4c);
   radio.setDataRate(RF24_1MBPS);
+  radio.setPALevel(RF24_PA_LOW);
   radio.setCRCLength(RF24_CRC_16);
-  radio.setPayloadSize(32);
+  radio.setAutoAck(true);
+  radio.enableDynamicPayloads();
+  radio.enableAckPayload();
+
   radio.openWritingPipe(serverAddress);
   radio.openReadingPipe(1, listenAddress);
   radio.startListening();
@@ -43,7 +54,6 @@ void setupRadio() {
 }
 
 void registerWithServer() {
-  bool registered = false;
   char received[32] = "";
   
   char payload[8] = "";
@@ -60,8 +70,11 @@ void registerWithServer() {
           delay(5000);
         } else {
           clientId = (uint8_t)received[4];
+          memcpy(&serverId, &received[5], 8);
           Serial.print("Success; ClientId: ");
           Serial.print(clientId);
+          Serial.print("; ServerId: ");
+          Serial.print((long)serverId);
           Serial.print(";\n");
           registered = true;
         }
@@ -96,6 +109,8 @@ bool waitForPacket(uint8_t type, char* data) {
 
 bool sendPacket(uint8_t type, char* payload, uint8_t payloadSize) {
   char data[32] = "";
+  char ackData[8] = "";
+  uint64_t receivedServerId;
   bool failed;
   memcpy(&data[0], &counter, 1);
   memcpy(&data[1], &clientId, 1);
@@ -117,8 +132,21 @@ bool sendPacket(uint8_t type, char* payload, uint8_t payloadSize) {
 
   radio.stopListening();
   failed = radio.write( &data, 32 );
+
+  if (radio.isAckPayloadAvailable()) {
+    radio.read( &receivedServerId, 8 );
+    if (type != MESSAGE_REGISTER && receivedServerId != serverId) {
+        Serial.print("ACK Data: ");
+        Serial.print((long)receivedServerId);
+        Serial.print(" - ");
+        Serial.print((long)serverId);
+        Serial.print("\n");
+        registered = false;
+    }
+  }
+
   radio.startListening();
-  
+
   return failed;
 }
 
