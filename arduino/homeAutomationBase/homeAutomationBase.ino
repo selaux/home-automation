@@ -4,6 +4,8 @@
 #include "AESLib.h"
 #include "printf.h"
 
+#define DEBUG true
+
 // "Hhno91h7man80azy"
 const uint8_t key[] = { 25, 123, 90, 174, 198, 145, 40, 33, 98, 90, 90, 111, 78, 65, 184, 188 };
 uint8_t counter = 0;
@@ -21,8 +23,10 @@ const uint8_t MESSAGE_REGISTER_ACK = 1;
 bool registered = false;
 
 void setup() {
+  #ifdef DEBUG
   Serial.begin(57600);
   printf_begin();
+  #endif
   setupRadio();
   delay(100);
 }
@@ -55,27 +59,34 @@ void setupRadio() {
 
 void registerWithServer() {
   char received[32] = "";
-  
   char payload[8] = "";
   memcpy(&payload[0], &listenAddress, 8);
   
   while (!registered) {
+    #ifdef DEBUG
     Serial.print("Registering: ");
+    #endif
     if (!sendPacket(MESSAGE_REGISTER, payload, 8)) {
+        #ifdef DEBUG
         Serial.print("Failed sending packet;\n");
+        #endif
         delay(5000);
     } else {
         if (!waitForPacket(MESSAGE_REGISTER_ACK, received)) {
+          #ifdef DEBUG
           Serial.print("Failed;\n");
+          #endif
           delay(5000);
         } else {
           clientId = (uint8_t)received[4];
           memcpy(&serverId, &received[5], 8);
+          #ifdef DEBUG
           Serial.print("Success; ClientId: ");
           Serial.print(clientId);
           Serial.print("; ServerId: ");
           Serial.print((long)serverId);
           Serial.print(";\n");
+          #endif
           registered = true;
         }
     }
@@ -88,18 +99,17 @@ bool waitForPacket(uint8_t type, char* data) {
   bool correctPacket = false;
   bool available = false;
   
+  #ifdef DEBUG
   Serial.print("Waiting: ");
+  #endif
   while (!timeout && !correctPacket) {
     available = radio.available();
     if (available) {
       radio.read( &data[0], 32 );
       decryptPayload(data);
-      Serial.print("Receiving: ");
-        for (int i = 0; i < 32; i++) {
-          Serial.print((uint8_t)data[i], HEX);
-          Serial.print(" ");
-        }
-        Serial.print("\n");
+      #ifdef DEBUG
+      printCharArray("Receiving", data, 32);
+      #endif
       correctPacket = (uint8_t)data[2] == type;
     }
     timeout = millis() - started_waiting_at > 5000;
@@ -119,14 +129,9 @@ bool sendPacket(uint8_t type, char* payload, uint8_t payloadSize) {
   memcpy(&data[4], &payload[0], (int)payloadSize);
   counter++;
 
-  Serial.print("Sending Before: ");
-    Serial.print(counter);
-    Serial.print(": ");
-    for (int i = 0; i < 32; i++) {
-      Serial.print((uint8_t)data[i], HEX);
-      Serial.print(" ");
-    }
-    Serial.print("\n");
+  #ifdef DEBUG
+  printCharArray("Sending", data, 32);
+  #endif
 
   encryptPayload(data);
 
@@ -136,11 +141,13 @@ bool sendPacket(uint8_t type, char* payload, uint8_t payloadSize) {
   if (radio.isAckPayloadAvailable()) {
     radio.read( &receivedServerId, 8 );
     if (type != MESSAGE_REGISTER && receivedServerId != serverId) {
+        #ifdef DEBUG
         Serial.print("ACK Data: ");
         Serial.print((long)receivedServerId);
         Serial.print(" - ");
         Serial.print((long)serverId);
         Serial.print("\n");
+        #endif
         registered = false;
     }
   }
@@ -149,6 +156,18 @@ bool sendPacket(uint8_t type, char* payload, uint8_t payloadSize) {
 
   return failed;
 }
+
+#ifdef DEBUG
+void printCharArray(char* label, char* data, int length) {
+    Serial.print(label);
+    Serial.print(": ");
+    for (int i = 0; i < length; i++) {
+      Serial.print((uint8_t)data[i], HEX);
+      Serial.print(" ");
+    }
+    Serial.print("\n");
+}
+#endif
 
 void encryptPayload(char* data) {
   aes128_enc_single(key, data);
