@@ -1,0 +1,11 @@
+[MASTER]
+persistent=no
+
+[REPORTS]
+output-format=text
+
+[MESSAGES CONTROL]
+disable=import-error
+
+[FORMAT]
+max-line-length=120
