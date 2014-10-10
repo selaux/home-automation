@@ -5,7 +5,7 @@ persistent=no
 output-format=text
 
 [MESSAGES CONTROL]
-disable=import-error,no-name-in-module
+disable=import-error,no-name-in-module,too-few-public-methods
 
 [FORMAT]
 max-line-length=120
