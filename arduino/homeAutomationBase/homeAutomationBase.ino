@@ -1,5 +1,4 @@
 #include <SPI.h>
-#include "nRF24L01.h"
 #include "RF24.h"
 #include "AESLib.h"
 #include "printf.h"
