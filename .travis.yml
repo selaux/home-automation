@@ -7,4 +7,4 @@ install:
   - "pip install -r gateway/requirements.txt"
   - "pip install -r gateway/dev-requirements.txt"
 script:
-  - "pylint --rcfile=.pylintrc gateway/*.py"
+  - "./test.sh"
