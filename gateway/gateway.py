@@ -34,7 +34,7 @@ def initialize_radio():
     radio.setPayloadSize(32)
     radio.setChannel(0x4c)
     radio.setDataRate(NRF24.BR_1MBPS)
-    radio.setPALevel(NRF24.PA_LOW)
+    radio.setPALevel(NRF24.PA_HIGH)
     radio.setCRCLength(NRF24.CRC_16)
     radio.setAutoAck(True)
     radio.enableAckPayload()

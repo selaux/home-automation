@@ -33,11 +33,11 @@ void setup() {
 
 void loop() {
   char data[4] = { 0x12, 0x11, 0x10, 0x09 };
-  sendPacket(5, data, 4);
   if (!registered) {
     registerWithServer();
   }
   delay(2500);
+  sendPacket(5, data, 4);
 }
 
 void setupRadio() {
@@ -45,7 +45,7 @@ void setupRadio() {
   radio.setRetries(15, 15);
   radio.setChannel(0x4c);
   radio.setDataRate(RF24_1MBPS);
-  radio.setPALevel(RF24_PA_LOW);
+  radio.setPALevel(RF24_PA_HIGH);
   radio.setCRCLength(RF24_CRC_16);
   radio.setAutoAck(true);
   radio.enableDynamicPayloads();
