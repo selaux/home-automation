@@ -5,10 +5,11 @@ persistent=no
 output-format=text
 
 [MESSAGES CONTROL]
-disable=import-error,no-name-in-module,too-few-public-methods,missing-docstring,too-many-public-methods
+disable=import-error,no-name-in-module,too-few-public-methods,missing-docstring,too-many-public-methods,too-many-instance-attributes
 
 [FORMAT]
 max-line-length=120
 
 [BASIC]
 method-rgx=[a-z_][a-z0-9_]*$
+attr-rgx=[a-z_][_a-zA-Z0-9]{2,30}$
