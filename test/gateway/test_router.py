@@ -24,9 +24,12 @@ class TestRouter(unittest.TestCase):
         expected_client_id = random.randint(1, 255)
         expected_packet_id = 1
         expected_response = bytes([expected_client_id]) + bytes(self.mock_server_id)
-        router_instance = router.Router(self.send_packet_stub)
+        router_instance = router.Router()
 
-        yield from router_instance.handle_packet(expected_client_id, registration_packet_id, payload)
+        yield from router_instance.handle_packet(expected_client_id,
+                                                 registration_packet_id,
+                                                 payload,
+                                                 self.send_packet_stub)
 
         self.send_packet_stub.assert_called_once_with(expected_client_id, expected_packet_id, expected_response)
 

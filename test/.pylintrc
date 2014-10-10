@@ -5,7 +5,7 @@ persistent=no
 output-format=text
 
 [MESSAGES CONTROL]
-disable=import-error,no-name-in-module,too-few-public-methods,missing-docstring,too-many-public-methods,too-many-instance-attributes
+disable=import-error,no-name-in-module,too-few-public-methods,missing-docstring,too-many-public-methods,too-many-instance-attributes,no-self-use
 
 [FORMAT]
 max-line-length=120

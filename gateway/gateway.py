@@ -2,7 +2,19 @@
 
 import atexit
 import asyncio
-import RPi.GPIO as GPIO
+import os
+try:
+    import RPi.GPIO as GPIO
+except(RuntimeError, ImportError) as error:
+    if 'TEST_ENV' in os.environ:
+        print("Assuming test-environment")
+        class GPIO:
+            """This will be stubbed in tests"""
+            def __init__(self):
+                pass
+    else:
+        raise error
+from functools import partial
 
 from radio import Radio
 from router import Router
@@ -10,32 +22,26 @@ from router import Router
 def initialize_gpio():
     """Initialize GPIO (handles pin numbering and cleanup)"""
     GPIO.setmode(GPIO.BCM)
+    atexit.register(GPIO.cleanup)
 
-    @atexit.register
-    def dummy_cleanup_gpio():
-        """Clean up GPIO pins"""
-        print("Cleaning up GPIO before exit")
-        GPIO.cleanup()
-
-@asyncio.coroutine
-def run():
+def poll(loop, radio, router):
     """Poll for radio messages, decrypt them and pass them to the handler"""
-    initialize_gpio()
-    radio = Radio()
-    router = Router(radio.send_packet)
+    if radio.is_packet_available():
+        client_id, message_id, payload = radio.get_packet()
+        asyncio.async(router.handle_packet(client_id, message_id, payload, radio.send_packet))
 
-    while True:
-        if not radio.is_packet_available():
-            yield from asyncio.sleep(0.04)
-        else:
-            client_id, message_id, payload = radio.get_packet()
-            asyncio.async(router.handle_packet(client_id, message_id, payload))
+    loop.call_later(0.04, partial(poll, loop, radio, router))
 
 def main():
     """Runs the gateway"""
+    initialize_gpio()
+    radio = Radio()
+    router = Router()
+
     loop = asyncio.get_event_loop()
+    poll(loop, radio, router)
     try:
-        loop.run_until_complete(run())
+        loop.run_forever()
     finally:
         loop.close()
 
