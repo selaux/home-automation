@@ -16,6 +16,7 @@ uint64_t serverId;
 uint64_t listenAddress = 0xF0F0F0F0D2LL;
 uint8_t clientId = 0;
 
+const uint8_t MAX_PAYLOAD_SIZE = 27;
 const uint8_t MESSAGE_REGISTER = 0;
 const uint8_t MESSAGE_REGISTER_ACK = 1;
 
@@ -28,6 +29,7 @@ void setup() {
   #endif
   setupRadio();
   delay(100);
+  randomSeed(analogRead(0));
 }
 
 void loop() {
@@ -128,6 +130,9 @@ bool sendPacket(uint8_t type, char* payload, uint8_t payloadSize) {
   memcpy(&data[2], &type, 1);
   memcpy(&data[3], &payloadSize, 1);
   memcpy(&data[4], &payload[0], (int)payloadSize);
+  for (int i = 0; i < MAX_PAYLOAD_SIZE - payloadSize; i++) {
+    data[4+payloadSize+i] = (uint8_t) random(0,255);
+  }
   memcpy(&data[31], &counter_low, 1);
   counter++;
 

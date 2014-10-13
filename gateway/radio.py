@@ -13,9 +13,11 @@ except(RuntimeError, ImportError) as error:
     else:
         raise error
 from struct import pack, unpack
+from random import randint
 from crypto import decrypt_packet, encrypt_packet
 from settings import SERVER_ADDRESS, SERVER_ID
 
+MAX_PAYLOAD_SIZE = 27
 
 class Radio():
     """Wrapper around the nrf24 radio including client_id and crypto handling"""
@@ -38,7 +40,6 @@ class Radio():
         self.nrf24.setCRCLength(NRF24.CRC_16)
         self.nrf24.setAutoAck(True)
         self.nrf24.enableAckPayload()
-
         self.nrf24.openReadingPipe(1, self.server_address)
         self.nrf24.openWritingPipe(self.server_address)
         self.nrf24.startListening()
@@ -49,7 +50,10 @@ class Radio():
         """Send packet to a client"""
         address = self.client_ids_to_addresses[client_id]
         payload_size = len(payload)
-        packed = pack('BBBB28s', 1, 0, packet_id, payload_size, payload)
+        padded_packet = [randint(0, 255) for dummy in range(0, MAX_PAYLOAD_SIZE - payload_size)]
+        padded_packet[:0] = payload
+
+        packed = pack('BBBB28s', 1, 0, packet_id, payload_size, bytes(padded_packet))
         encrypted = encrypt_packet(bytes(packed))
 
         self.nrf24.stopListening()

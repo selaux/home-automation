@@ -70,7 +70,6 @@ class TestRadio(unittest.TestCase):
     @patch.object(radio, 'encrypt_packet')
     def test_send_packet_with_success(self, encrypt_mock):
         expected_packet = [1, 0, 5, 4, 1, 2, 3, 4]
-        expected_packet.extend([0] * 24)
         expected_packet = bytes(expected_packet)
         encrypted_packet = bytes([8] * 32)
         radio_instance = radio.Radio()
@@ -83,7 +82,8 @@ class TestRadio(unittest.TestCase):
 
         success = radio_instance.send_packet(1, 5, bytes([1, 2, 3, 4]))
 
-        encrypt_mock.assert_called_once_with(expected_packet)
+        self.assertEqual(len(encrypt_mock.call_args[0][0]), 32)
+        self.assertEqual(encrypt_mock.call_args[0][0][:len(expected_packet)], expected_packet)
         radio_instance.nrf24.stopListening.assert_called_once_with()
         radio_instance.nrf24.openReadingPipe.assert_called_once_with(1, self.mock_server_address)
         radio_instance.nrf24.openWritingPipe.assert_called_once_with(self.mock_client_address)
