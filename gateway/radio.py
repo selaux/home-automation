@@ -76,7 +76,8 @@ class Radio():
         self.nrf24.read(encrypted_packet, 32)
         decrypted_packet = decrypt_packet(encrypted_packet)
 
-        counter, client_id, message_id, payload_length = unpack('BBBB', decrypted_packet[:4])
+        client_id, message_id, payload_length = unpack('BBB', decrypted_packet[1:4])
+        counter = unpack('H', decrypted_packet[-1:] + decrypted_packet[:1])[0]
         payload = decrypted_packet[4:(4+payload_length)]
 
         if message_id == 0:

@@ -7,7 +7,7 @@
 
 // "Hhno91h7man80azy"
 const uint8_t key[] = { 25, 123, 90, 174, 198, 145, 40, 33, 98, 90, 90, 111, 78, 65, 184, 188 };
-uint8_t counter = 0;
+uint16_t counter = 0;
 
 RF24 radio(9, 10);
 const uint64_t serverAddress = 0xF0F0F0F0E1LL;
@@ -119,13 +119,16 @@ bool waitForPacket(uint8_t type, char* data) {
 bool sendPacket(uint8_t type, char* payload, uint8_t payloadSize) {
   char data[32] = "";
   char ackData[8] = "";
+  uint8_t counter_low = counter & 0xFF;
+  uint8_t counter_high = counter  >> 8;
   uint64_t receivedServerId;
   bool failed;
-  memcpy(&data[0], &counter, 1);
+  memcpy(&data[0], &counter_high, 1);
   memcpy(&data[1], &clientId, 1);
   memcpy(&data[2], &type, 1);
   memcpy(&data[3], &payloadSize, 1);
   memcpy(&data[4], &payload[0], (int)payloadSize);
+  memcpy(&data[31], &counter_low, 1);
   counter++;
 
   #ifdef DEBUG

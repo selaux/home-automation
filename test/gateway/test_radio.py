@@ -120,8 +120,9 @@ class TestRadio(unittest.TestCase):
         expected_client_id = 100
         expected_message_id = 101
         expected_payload = [1, 2, 3, 4]
-        decrypted_packet = [0, expected_client_id, expected_message_id, len(expected_payload)]
+        decrypted_packet = [39, expected_client_id, expected_message_id, len(expected_payload)]
         decrypted_packet.extend(expected_payload)
+        decrypted_packet.extend([16])
         decrypt_mock.return_value = bytes(decrypted_packet)
 
         client_id, message_id, payload = radio_instance.get_packet()
@@ -136,12 +137,13 @@ class TestRadio(unittest.TestCase):
         address = self.mock_client_address
         radio_instance = radio.Radio()
         radio_instance.get_client_id = Mock()
-        expected_counter = 99
+        expected_counter = 10000
         expected_client_id = 100
         radio_instance.get_client_id.return_value = expected_client_id
         registration_message_id = 0
-        decrypted_packet = [expected_counter, expected_client_id, registration_message_id, len(address)]
+        decrypted_packet = [39, expected_client_id, registration_message_id, len(address)]
         decrypted_packet.extend(address[::-1])
+        decrypted_packet.extend([16])
         decrypt_mock.return_value = bytes(decrypted_packet)
 
         client_id, message_id, payload = radio_instance.get_packet()
