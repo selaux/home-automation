@@ -177,17 +177,17 @@ void printCharArray(char* label, char* data, int length) {
 #endif
 
 void encryptPayload(char* data) {
-  aes128_enc_single(key, data);
-  for (int i = 0; i < 16; i++) {
-      data[16+i] = data[16+i] ^ data[i];
-  }
   aes128_enc_single(key, data + 16);
+  for (int i = 0; i < 16; i++) {
+      data[i] = data[16+i] ^ data[i];
+  }
+  aes128_enc_single(key, data);
 }
 
 void decryptPayload(char* data) {
-  aes128_dec_single(key, data + 16);
+  aes128_dec_single(key, data);
   for (int i = 0; i < 16; i++) {
-      data[16+i] = data[16+i] ^ data[i];
+      data[i] = data[16+i] ^ data[i];
   }
-  aes128_dec_single(key, data);  
+  aes128_dec_single(key, data + 16);
 }

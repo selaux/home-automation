@@ -10,9 +10,9 @@ def decrypt_packet(packet):
     encrypted_part1 = bytes(packet[0:16])
     encrypted_part2 = bytes(packet[16:32])
 
-    intermediate_part2 = cipher.decrypt(encrypted_part2)
-    decrypted_part2 = bytes([e ^ i for e, i in zip(encrypted_part1, intermediate_part2)])
-    decrypted_part1 = cipher.decrypt(encrypted_part1)
+    intermediate_part1 = cipher.decrypt(encrypted_part1)
+    decrypted_part1 = bytes([e ^ i for e, i in zip(encrypted_part2, intermediate_part1)])
+    decrypted_part2 = cipher.decrypt(encrypted_part2)
 
     return decrypted_part1 + decrypted_part2
 
@@ -24,8 +24,8 @@ def encrypt_packet(packet):
     decrypted_part1 = bytes(packet[0:16])
     decrypted_part2 = bytes(packet[16:32])
 
-    encrypted_part1 = cipher.encrypt(decrypted_part1)
-    intermediate_part2 = bytes([e ^ i for e, i in zip(encrypted_part1, decrypted_part2)])
-    encrypted_part2 = cipher.encrypt(intermediate_part2)
+    encrypted_part2 = cipher.encrypt(decrypted_part2)
+    intermediate_part1 = bytes([e ^ i for e, i in zip(encrypted_part2, decrypted_part1)])
+    encrypted_part1 = cipher.encrypt(intermediate_part1)
 
     return encrypted_part1 + encrypted_part2
