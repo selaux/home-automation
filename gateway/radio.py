@@ -18,6 +18,8 @@ from crypto import decrypt_packet, encrypt_packet
 from settings import SERVER_ADDRESS, SERVER_ID
 
 MAX_PAYLOAD_SIZE = 27
+MAX_UINT16 = 65535
+
 
 class Radio():
     """Wrapper around the nrf24 radio including client_id and crypto handling"""
@@ -76,17 +78,34 @@ class Radio():
         decrypted_packet = decrypt_packet(encrypted_packet)
 
         client_id, message_id, payload_length = unpack('BBB', decrypted_packet[1:4])
-        counter = unpack('H', decrypted_packet[-1:] + decrypted_packet[:1])[0]
+        received_counter = unpack('H', decrypted_packet[-1:] + decrypted_packet[:1])[0]
+        payload_length = min(payload_length, MAX_PAYLOAD_SIZE)
         payload = decrypted_packet[4:(4+payload_length)]
 
         if message_id == 0:
-            client_id = self.handle_registration_message(counter, payload)
+            client_id = self.handle_registration_message(received_counter, payload)
 
-        all_existing_client_ids = [c['client_id'] for c in self.clients]
-        if client_id not in all_existing_client_ids:
+        if not self.has_client_id(client_id):
             return False
 
+        if not self.is_counter_is_in_expected_range(client_id, received_counter):
+            return False
+
+        client = next((c for c in self.clients if c['client_id'] == client_id), None)
+        client['client_counter'] = received_counter
+
         return client_id, message_id, payload
+
+    def is_counter_is_in_expected_range(self, client_id, received_counter):
+        """ Is the received client_counter within the expected range
+            Expected range: [last counter + 1, last_counter+10] with respect to the value range of uint8_t
+        """
+        last_counter = next((c['client_counter'] for c in self.clients if c['client_id'] == client_id))
+        maximum = MAX_UINT16
+        expected_range = [
+            last_counter+i if last_counter+i <= maximum else last_counter+i-maximum-1 for i in range(1, 11)
+        ]
+        return received_counter in expected_range
 
     def get_client_id(self, address):
         """Get a client id for a specific address"""
@@ -102,16 +121,22 @@ class Radio():
 
         return False
 
+    def has_client_id(self, client_id):
+        """Does the gateway have this client_id registered"""
+        all_existing_client_ids = [c['client_id'] for c in self.clients]
+        return client_id in all_existing_client_ids
+
     def handle_registration_message(self, counter, payload):
         """Handle the registration of a client without client_id"""
         address = list(unpack('<BBBBB', payload[:5])[::-1])
         new_client_id = self.get_client_id(address)
 
+        self.clients = [c for c in self.clients if c['client_id'] is not new_client_id]
         self.clients.append({
             'client_id': new_client_id,
             'address': address,
-            'clientCounter': counter,
-            'serverCounter': randint(0, 65535)
+            'client_counter': counter-1,
+            'server_counter': randint(0, MAX_UINT16)
         })
 
         return new_client_id

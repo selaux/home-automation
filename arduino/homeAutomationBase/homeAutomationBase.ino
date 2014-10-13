@@ -7,7 +7,7 @@
 
 // "Hhno91h7man80azy"
 const uint8_t key[] = { 25, 123, 90, 174, 198, 145, 40, 33, 98, 90, 90, 111, 78, 65, 184, 188 };
-uint16_t counter = 0;
+uint16_t myCounter = 0;
 
 RF24 radio(9, 10);
 const uint64_t serverAddress = 0xF0F0F0F0E1LL;
@@ -30,6 +30,7 @@ void setup() {
   setupRadio();
   delay(100);
   randomSeed(analogRead(0));
+  myCounter = random(0, 65535);
 }
 
 void loop() {
@@ -121,10 +122,10 @@ bool waitForPacket(uint8_t type, char* data) {
 bool sendPacket(uint8_t type, char* payload, uint8_t payloadSize) {
   char data[32] = "";
   char ackData[8] = "";
-  uint8_t counter_low = counter & 0xFF;
-  uint8_t counter_high = counter  >> 8;
+  uint8_t counter_low = myCounter & 0xFF;
+  uint8_t counter_high = myCounter  >> 8;
   uint64_t receivedServerId;
-  bool failed;
+  bool success;
   memcpy(&data[0], &counter_high, 1);
   memcpy(&data[1], &clientId, 1);
   memcpy(&data[2], &type, 1);
@@ -134,7 +135,6 @@ bool sendPacket(uint8_t type, char* payload, uint8_t payloadSize) {
     data[4+payloadSize+i] = (uint8_t) random(0,255);
   }
   memcpy(&data[31], &counter_low, 1);
-  counter++;
 
   #ifdef DEBUG
   printCharArray("Sending", data, 32);
@@ -143,7 +143,11 @@ bool sendPacket(uint8_t type, char* payload, uint8_t payloadSize) {
   encryptPayload(data);
 
   radio.stopListening();
-  failed = radio.write( &data, 32 );
+  success = radio.write( &data, 32 );
+
+  if (success) {
+    myCounter++;
+  }
 
   if (radio.isAckPayloadAvailable()) {
     radio.read( &receivedServerId, 8 );
@@ -161,7 +165,7 @@ bool sendPacket(uint8_t type, char* payload, uint8_t payloadSize) {
 
   radio.startListening();
 
-  return failed;
+  return success;
 }
 
 #ifdef DEBUG

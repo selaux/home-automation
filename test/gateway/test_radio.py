@@ -101,42 +101,54 @@ class TestRadio(unittest.TestCase):
 
         self.assertEqual(success, False)
 
-    @patch.object(radio, 'decrypt_packet')
-    def test_get_packet_with_a_packet_available(self, decrypt_mock):
+    def setup_for_test_get_packet(self, decrypt_mock):
         radio_instance = radio.Radio()
         radio_instance.nrf24.available.return_value = True
-        expected_client_id = 100
-        radio_instance.clients.append({'client_id': expected_client_id})
-        expected_message_id = 101
-        expected_payload = [1, 2, 3, 4]
-        decrypted_packet = [39, expected_client_id, expected_message_id, len(expected_payload)]
-        decrypted_packet.extend(expected_payload)
-        decrypted_packet.extend([16])
+        radio_instance.has_client_id = Mock(return_value=True)
+        radio_instance.is_counter_is_in_expected_range = Mock(return_value=True)
+        client_id = 100
+        message_id = 101
+        payload = [1, 2, 3, 4]
+        counter_byte_1 = 16
+        counter_byte_2 = 39
+        decrypted_packet = [counter_byte_2, client_id, message_id, len(payload)]
+        decrypted_packet.extend(payload)
+        decrypted_packet.extend([counter_byte_1])
         decrypt_mock.return_value = bytes(decrypted_packet)
+        return radio_instance
+
+    @patch.object(radio, 'decrypt_packet')
+    def test_get_packet_with_a_packet_available(self, decrypt_mock):
+        radio_instance = self.setup_for_test_get_packet(decrypt_mock)
+        radio_instance.clients.append({'client_id': 100, 'client_counter': 9999})
 
         client_id, message_id, payload = radio_instance.get_packet()
 
-        self.assertEqual(client_id, expected_client_id)
-        self.assertEqual(message_id, expected_message_id)
-        self.assertEqual(payload, bytes(expected_payload))
+        self.assertEqual(client_id, 100)
+        self.assertEqual(message_id, 101)
+        self.assertEqual(payload, bytes([1, 2, 3, 4]))
+        self.assertEqual(radio_instance.clients[0]['client_counter'], 10000)
         decrypt_mock.assert_called_once_with([])
+        radio_instance.has_client_id.assert_called_once_with(100)
+        radio_instance.is_counter_is_in_expected_range.assert_called_once_with(100, 10000)
 
     @patch.object(radio, 'decrypt_packet')
-    def test_get_packet_with_a_packet_available_that_carries_a_unknown_client_id(self, decrypt_mock):
-        radio_instance = radio.Radio()
-        radio_instance.nrf24.available.return_value = True
-        client_id = 100
-        expected_message_id = 101
-        expected_payload = [1, 2, 3, 4]
-        decrypted_packet = [39, client_id, expected_message_id, len(expected_payload)]
-        decrypted_packet.extend(expected_payload)
-        decrypted_packet.extend([16])
-        decrypt_mock.return_value = bytes(decrypted_packet)
+    def test_get_packet_with_a_packet_that_has_a_unknown_client_id(self, decrypt_mock):
+        radio_instance = self.setup_for_test_get_packet(decrypt_mock)
+        radio_instance.has_client_id.return_value = False
 
         self.assertEqual(radio_instance.get_packet(), False)
 
-    def test_get_packet_without_a_packet_available(self):
-        radio_instance = radio.Radio()
+    @patch.object(radio, 'decrypt_packet')
+    def test_get_packet_with_a_packet_that_has_a_counter_that_is_not_in_the_expected_range(self, decrypt_mock):
+        radio_instance = self.setup_for_test_get_packet(decrypt_mock)
+        radio_instance.is_counter_is_in_expected_range.return_value = False
+
+        self.assertEqual(radio_instance.get_packet(), False)
+
+    @patch.object(radio, 'decrypt_packet')
+    def test_get_packet_without_a_packet_available(self, decrypt_mock):
+        radio_instance = self.setup_for_test_get_packet(decrypt_mock)
         radio_instance.nrf24.available.return_value = False
 
         self.assertEqual(radio_instance.get_packet(), False)
@@ -144,12 +156,10 @@ class TestRadio(unittest.TestCase):
     @patch.object(radio, 'decrypt_packet')
     def test_get_packet_with_registration_message(self, decrypt_mock):
         address = self.mock_client_address
-        radio_instance = radio.Radio()
-        radio_instance.get_client_id = Mock()
-        expected_counter = 10000
         expected_client_id = 100
-        radio_instance.get_client_id.return_value = expected_client_id
         registration_message_id = 0
+        radio_instance = self.setup_for_test_get_packet(decrypt_mock)
+        radio_instance.get_client_id = Mock(return_value=expected_client_id)
         decrypted_packet = [39, expected_client_id, registration_message_id, len(address)]
         decrypted_packet.extend(address[::-1])
         decrypted_packet.extend([16])
@@ -161,7 +171,40 @@ class TestRadio(unittest.TestCase):
         self.assertEqual(message_id, registration_message_id)
         self.assertEqual(payload, bytes(address[::-1]))
         self.assertEqual(radio_instance.clients[0]['client_id'], expected_client_id)
-        self.assertEqual(radio_instance.clients[0]['clientCounter'], expected_counter)
+        self.assertEqual(radio_instance.clients[0]['client_counter'], 10000)
+
+    def test_is_counter_in_expected_range(self):
+        client_id = 100
+        current_client_counter = 65533
+        test_cases = [
+            (100, False),
+            (65533, False),
+            (65534, True),
+            (65535, True),
+            (0, True),
+            (7, True),
+            (8, False),
+            (10, False),
+        ]
+
+        radio_instance = radio.Radio()
+        radio_instance.clients.append({'client_id': client_id, 'client_counter': current_client_counter})
+        for counter, expected in test_cases:
+            with self.subTest(counter=counter, expected=expected):
+                self.assertEqual(radio_instance.is_counter_is_in_expected_range(client_id, counter), expected)
+
+    def test_has_client_id(self):
+        client_id = 100
+        test_cases = [
+            ([{'client_id':100}], True),
+            ([{'client_id':101}], False),
+            ([], False),
+        ]
+        radio_instance = radio.Radio()
+        for clients, expected in test_cases:
+            with self.subTest(clients=clients, expected=expected):
+                radio_instance.clients = clients
+                self.assertEqual(radio_instance.has_client_id(client_id), expected)
 
     def test_get_client_id_with_new_client_address(self):
         radio_instance = radio.Radio()
