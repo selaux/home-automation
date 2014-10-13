@@ -73,7 +73,7 @@ class TestRadio(unittest.TestCase):
         expected_packet = bytes(expected_packet)
         encrypted_packet = bytes([8] * 32)
         radio_instance = radio.Radio()
-        radio_instance.client_ids_to_addresses[1] = self.mock_client_address
+        radio_instance.clients = [{'client_id': 1, 'address': self.mock_client_address}]
         radio_instance.nrf24.openReadingPipe.reset_mock()
         radio_instance.nrf24.openWritingPipe.reset_mock()
         radio_instance.nrf24.startListening.reset_mock()
@@ -94,7 +94,7 @@ class TestRadio(unittest.TestCase):
 
     def test_send_packet_with_error(self):
         radio_instance = radio.Radio()
-        radio_instance.client_ids_to_addresses[1] = self.mock_client_address
+        radio_instance.clients = [{'client_id': 1, 'address': self.mock_client_address}]
         radio_instance.nrf24.write.return_value = False
 
         success = radio_instance.send_packet(1, 5, bytes([1, 2, 3, 4]))
@@ -145,15 +145,15 @@ class TestRadio(unittest.TestCase):
         self.assertEqual(client_id, expected_client_id)
         self.assertEqual(message_id, registration_message_id)
         self.assertEqual(payload, bytes(address[::-1]))
-        self.assertEqual(radio_instance.client_ids_to_addresses[expected_client_id], address)
-        self.assertEqual(radio_instance.client_ids_to_counters[expected_client_id], expected_counter)
+        self.assertEqual(radio_instance.clients[0]['client_id'], expected_client_id)
+        self.assertEqual(radio_instance.clients[0]['clientCounter'], expected_counter)
 
     def test_get_client_id_with_new_client_address(self):
         radio_instance = radio.Radio()
         number_already_registered = random.randint(0, 255)
 
         for i in range(number_already_registered):
-            radio_instance.client_ids_to_addresses[i+1] = self.other_mock_client_address
+            radio_instance.clients.append({'client_id': i+1, 'address': self.other_mock_client_address})
 
         self.assertEqual(radio_instance.get_client_id(self.mock_client_address), number_already_registered+1)
 
@@ -161,7 +161,7 @@ class TestRadio(unittest.TestCase):
         radio_instance = radio.Radio()
         expected_client_id = random.randint(1, 255)
 
-        radio_instance.client_ids_to_addresses[expected_client_id] = self.mock_client_address
+        radio_instance.clients.append({'client_id': expected_client_id, 'address': self.mock_client_address})
 
         self.assertEqual(radio_instance.get_client_id(self.mock_client_address), expected_client_id)
 
@@ -170,7 +170,7 @@ class TestRadio(unittest.TestCase):
         number_already_registered = 254
 
         for i in range(number_already_registered):
-            radio_instance.client_ids_to_addresses[i+1] = self.other_mock_client_address
+            radio_instance.clients.append({'client_id': i+1, 'address': self.other_mock_client_address})
 
         self.assertEqual(radio_instance.get_client_id(self.mock_client_address), False)
 

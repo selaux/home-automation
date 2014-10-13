@@ -26,8 +26,7 @@ class Radio():
         """Setup the radio module"""
         self.server_address = SERVER_ADDRESS
         self.server_id = SERVER_ID
-        self.client_ids_to_addresses = {}
-        self.client_ids_to_counters = {}
+        self.clients = []
 
         self.nrf24 = NRF24()
         self.nrf24.begin(0, 0, 25, 24)
@@ -48,7 +47,7 @@ class Radio():
 
     def send_packet(self, client_id, packet_id, payload):
         """Send packet to a client"""
-        address = self.client_ids_to_addresses[client_id]
+        address = next((c['address'] for c in self.clients if c['client_id'] == client_id), None)
         payload_size = len(payload)
         padded_packet = [randint(0, 255) for dummy in range(0, MAX_PAYLOAD_SIZE - payload_size)]
         padded_packet[:0] = payload
@@ -87,12 +86,14 @@ class Radio():
 
     def get_client_id(self, address):
         """Get a client id for a specific address"""
-        for client_id, stored_address in self.client_ids_to_addresses.items():
-            if bytes(stored_address) == bytes(address):
-                return client_id
+        all_existing_client_ids = [c['client_id'] for c in self.clients]
+        existing_client_id = next((c['client_id'] for c in self.clients if c['address'] == address), None)
+
+        if existing_client_id:
+            return existing_client_id
 
         for i in range(1, 255):
-            if not i in self.client_ids_to_addresses:
+            if not i in all_existing_client_ids:
                 return i
 
         return False
@@ -102,7 +103,11 @@ class Radio():
         address = list(unpack('<BBBBB', payload[:5])[::-1])
         new_client_id = self.get_client_id(address)
 
-        self.client_ids_to_addresses[new_client_id] = address
-        self.client_ids_to_counters[new_client_id] = counter
+        self.clients.append({
+            'client_id': new_client_id,
+            'address': address,
+            'clientCounter': counter,
+            'serverCounter': randint(0, 65535)
+        })
 
         return new_client_id
