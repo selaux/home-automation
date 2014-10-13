@@ -82,6 +82,10 @@ class Radio():
         if message_id == 0:
             client_id = self.handle_registration_message(counter, payload)
 
+        all_existing_client_ids = [c['client_id'] for c in self.clients]
+        if client_id not in all_existing_client_ids:
+            return False
+
         return client_id, message_id, payload
 
     def get_client_id(self, address):

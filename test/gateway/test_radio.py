@@ -106,6 +106,7 @@ class TestRadio(unittest.TestCase):
         radio_instance = radio.Radio()
         radio_instance.nrf24.available.return_value = True
         expected_client_id = 100
+        radio_instance.clients.append({'client_id': expected_client_id})
         expected_message_id = 101
         expected_payload = [1, 2, 3, 4]
         decrypted_packet = [39, expected_client_id, expected_message_id, len(expected_payload)]
@@ -119,6 +120,20 @@ class TestRadio(unittest.TestCase):
         self.assertEqual(message_id, expected_message_id)
         self.assertEqual(payload, bytes(expected_payload))
         decrypt_mock.assert_called_once_with([])
+
+    @patch.object(radio, 'decrypt_packet')
+    def test_get_packet_with_a_packet_available_that_carries_a_unknown_client_id(self, decrypt_mock):
+        radio_instance = radio.Radio()
+        radio_instance.nrf24.available.return_value = True
+        client_id = 100
+        expected_message_id = 101
+        expected_payload = [1, 2, 3, 4]
+        decrypted_packet = [39, client_id, expected_message_id, len(expected_payload)]
+        decrypted_packet.extend(expected_payload)
+        decrypted_packet.extend([16])
+        decrypt_mock.return_value = bytes(decrypted_packet)
+
+        self.assertEqual(radio_instance.get_packet(), False)
 
     def test_get_packet_without_a_packet_available(self):
         radio_instance = radio.Radio()
