@@ -26,8 +26,9 @@ def initialize_gpio():
 
 def poll(loop, radio, router):
     """Poll for radio messages, decrypt them and pass them to the handler"""
-    if radio.is_packet_available():
-        client_id, message_id, payload = radio.get_packet()
+    packet = radio.get_packet()
+    if packet:
+        client_id, message_id, payload = packet
         asyncio.async(router.handle_packet(client_id, message_id, payload, radio.send_packet))
 
     loop.call_later(0.04, partial(poll, loop, radio, router))

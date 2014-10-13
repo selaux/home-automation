@@ -78,7 +78,6 @@ class TestGateway(unittest.TestCase):
 
         gateway.partial.return_value = 'PartiallyAppliedFn'
         router.handle_packet.return_value = 'Future'
-        radio.is_packet_available.return_value = True
         radio.get_packet.return_value = (expected_client_id, expected_message_id, expected_payload)
 
         gateway.poll(loop, radio, router)
@@ -93,4 +92,15 @@ class TestGateway(unittest.TestCase):
 
 
     def test_poll_without_packet_available(self):
-        pass
+        loop = Mock()
+        radio = Mock()
+        router = Mock()
+
+        radio.get_packet.return_value = False
+        gateway.partial.return_value = 'PartiallyAppliedFn'
+
+        gateway.poll(loop, radio, router)
+
+        self.assertEqual(router.handle_packet.call_count, 0)
+        loop.call_later.assert_called_once_with(0.04, 'PartiallyAppliedFn')
+

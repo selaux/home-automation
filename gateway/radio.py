@@ -65,17 +65,13 @@ class Radio():
             print("Failed sending packet!")
         return success
 
-    def is_packet_available(self):
-        """Check wether a packet is available, write ACK-payload otherwise"""
-        ack_payload = bytes(self.server_id)
-
-        if not self.nrf24.available():
-            self.nrf24.writeAckPayload(1, ack_payload, 8)
-            return False
-        return True
-
     def get_packet(self):
         """Get available packet from radio, if it is a registration packet handle it before passing on"""
+        if not self.nrf24.available():
+            ack_payload = bytes(self.server_id)
+            self.nrf24.writeAckPayload(1, ack_payload, 8)
+            return False
+
         encrypted_packet = []
         self.nrf24.read(encrypted_packet, 32)
         decrypted_packet = decrypt_packet(encrypted_packet)

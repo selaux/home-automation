@@ -101,22 +101,10 @@ class TestRadio(unittest.TestCase):
 
         self.assertEqual(success, False)
 
-    def test_is_packet_available_with_a_packet_available(self):
+    @patch.object(radio, 'decrypt_packet')
+    def test_get_packet_with_a_packet_available(self, decrypt_mock):
         radio_instance = radio.Radio()
         radio_instance.nrf24.available.return_value = True
-
-        self.assertEqual(radio_instance.is_packet_available(), True)
-
-    def test_is_packet_available_with_no_packet_available(self):
-        radio_instance = radio.Radio()
-        radio_instance.nrf24.available.return_value = False
-
-        self.assertEqual(radio_instance.is_packet_available(), False)
-        radio_instance.nrf24.writeAckPayload.assert_called_once_with(1, bytes(self.mock_server_id), 8)
-
-    @patch.object(radio, 'decrypt_packet')
-    def test_get_packet(self, decrypt_mock):
-        radio_instance = radio.Radio()
         expected_client_id = 100
         expected_message_id = 101
         expected_payload = [1, 2, 3, 4]
@@ -131,6 +119,12 @@ class TestRadio(unittest.TestCase):
         self.assertEqual(message_id, expected_message_id)
         self.assertEqual(payload, bytes(expected_payload))
         decrypt_mock.assert_called_once_with([])
+
+    def test_get_packet_without_a_packet_available(self):
+        radio_instance = radio.Radio()
+        radio_instance.nrf24.available.return_value = False
+
+        self.assertEqual(radio_instance.get_packet(), False)
 
     @patch.object(radio, 'decrypt_packet')
     def test_get_packet_with_registration_message(self, decrypt_mock):
