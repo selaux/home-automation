@@ -8,7 +8,7 @@ from mock import Mock, patch
 
 
 class MockNRF24():
-    BR_1MBPS = 1
+    BR_250KBPS = 1
     PA_HIGH = 2
     CRC_16 = 3
 
@@ -57,7 +57,7 @@ class TestRadio(unittest.TestCase):
         radio_instance.nrf24.setRetries.assert_called_once_with(15, 15)
         radio_instance.nrf24.setPayloadSize.assert_called_once_with(32)
         radio_instance.nrf24.setChannel.assert_called_once_with(0x4c)
-        radio_instance.nrf24.setDataRate.assert_called_once_with(MockNRF24.BR_1MBPS)
+        radio_instance.nrf24.setDataRate.assert_called_once_with(MockNRF24.BR_250KBPS)
         radio_instance.nrf24.setPALevel.assert_called_once_with(MockNRF24.PA_HIGH)
         radio_instance.nrf24.setCRCLength.assert_called_once_with(MockNRF24.CRC_16)
         radio_instance.nrf24.setAutoAck.assert_called_once_with(True)
@@ -69,11 +69,15 @@ class TestRadio(unittest.TestCase):
 
     @patch.object(radio, 'encrypt_packet')
     def test_send_packet_with_success(self, encrypt_mock):
-        expected_packet = [1, 0, 5, 4, 1, 2, 3, 4]
+        expected_packet = [39, 0, 5, 4, 1, 2, 3, 4]
         expected_packet = bytes(expected_packet)
         encrypted_packet = bytes([8] * 32)
         radio_instance = radio.Radio()
-        radio_instance.clients = [{'client_id': 1, 'address': self.mock_client_address}]
+        radio_instance.clients = [{
+            'client_id': 1,
+            'address': self.mock_client_address,
+            'server_counter': 10000
+        }]
         radio_instance.nrf24.openReadingPipe.reset_mock()
         radio_instance.nrf24.openWritingPipe.reset_mock()
         radio_instance.nrf24.startListening.reset_mock()
@@ -84,6 +88,7 @@ class TestRadio(unittest.TestCase):
 
         self.assertEqual(len(encrypt_mock.call_args[0][0]), 32)
         self.assertEqual(encrypt_mock.call_args[0][0][:len(expected_packet)], expected_packet)
+        self.assertEqual(encrypt_mock.call_args[0][0][-1], 16)
         radio_instance.nrf24.stopListening.assert_called_once_with()
         radio_instance.nrf24.openReadingPipe.assert_called_once_with(1, self.mock_server_address)
         radio_instance.nrf24.openWritingPipe.assert_called_once_with(self.mock_client_address)
@@ -94,7 +99,11 @@ class TestRadio(unittest.TestCase):
 
     def test_send_packet_with_error(self):
         radio_instance = radio.Radio()
-        radio_instance.clients = [{'client_id': 1, 'address': self.mock_client_address}]
+        radio_instance.clients = [{
+            'client_id': 1,
+            'address': self.mock_client_address,
+            'server_counter': 10000
+        }]
         radio_instance.nrf24.write.return_value = False
 
         success = radio_instance.send_packet(1, 5, bytes([1, 2, 3, 4]))

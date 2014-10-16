@@ -36,7 +36,7 @@ class Radio():
         self.nrf24.setRetries(15, 15)
         self.nrf24.setPayloadSize(32)
         self.nrf24.setChannel(0x4c)
-        self.nrf24.setDataRate(NRF24.BR_1MBPS)
+        self.nrf24.setDataRate(NRF24.BR_250KBPS)
         self.nrf24.setPALevel(NRF24.PA_HIGH)
         self.nrf24.setCRCLength(NRF24.CRC_16)
         self.nrf24.setAutoAck(True)
@@ -49,12 +49,14 @@ class Radio():
 
     def send_packet(self, client_id, packet_id, payload):
         """Send packet to a client"""
-        address = next((c['address'] for c in self.clients if c['client_id'] == client_id), None)
+        client = next((c for c in self.clients if c['client_id'] == client_id), None)
+        address = client['address']
+        counter_bytes = pack('H', client['server_counter'])
         payload_size = len(payload)
         padded_packet = [randint(0, 255) for dummy in range(0, MAX_PAYLOAD_SIZE - payload_size)]
         padded_packet[:0] = payload
 
-        packed = pack('BBBB28s', 1, 0, packet_id, payload_size, bytes(padded_packet))
+        packed = pack('BBBB27sB', counter_bytes[1], 0, packet_id, payload_size, bytes(padded_packet), counter_bytes[0])
         encrypted = encrypt_packet(bytes(packed))
 
         self.nrf24.stopListening()
@@ -64,6 +66,8 @@ class Radio():
         self.nrf24.startListening()
         if not success:
             print("Failed sending packet!")
+        else:
+            client['server_counter'] = client['server_counter']+1 if client['server_counter'] != MAX_UINT16 else 0
         return success
 
     def get_packet(self):

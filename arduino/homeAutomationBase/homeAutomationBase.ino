@@ -8,6 +8,7 @@
 // "Hhno91h7man80azy"
 const uint8_t key[] = { 25, 123, 90, 174, 198, 145, 40, 33, 98, 90, 90, 111, 78, 65, 184, 188 };
 uint16_t myCounter = 0;
+uint16_t serverCounter = 0;
 
 RF24 radio(9, 10);
 const uint64_t serverAddress = 0xF0F0F0F0E1LL;
@@ -35,6 +36,7 @@ void setup() {
 
 void loop() {
   char data[4] = { 0x12, 0x11, 0x10, 0x09 };
+  char received[32] = "";
   if (!registered) {
     registerWithServer();
   }
@@ -46,7 +48,7 @@ void setupRadio() {
   radio.begin();
   radio.setRetries(15, 15);
   radio.setChannel(0x4c);
-  radio.setDataRate(RF24_1MBPS);
+  radio.setDataRate(RF24_250KBPS);
   radio.setPALevel(RF24_PA_HIGH);
   radio.setCRCLength(RF24_CRC_16);
   radio.setAutoAck(true);
@@ -69,14 +71,11 @@ void registerWithServer() {
     Serial.print("Registering: ");
     #endif
     if (!sendPacket(MESSAGE_REGISTER, payload, 8)) {
-        #ifdef DEBUG
-        Serial.print("Failed sending packet;\n");
-        #endif
         delay(5000);
     } else {
-        if (!waitForPacket(MESSAGE_REGISTER_ACK, received)) {
+        if (!waitForPacket(MESSAGE_REGISTER_ACK, received, 100)) {
           #ifdef DEBUG
-          Serial.print("Failed;\n");
+          Serial.print("Failed Waiting;\n");
           #endif
           delay(5000);
         } else {
@@ -95,35 +94,63 @@ void registerWithServer() {
   }
 }
 
-bool waitForPacket(uint8_t type, char* data) {
+bool waitForPacket(uint8_t type, char* data, int timeout) {
   unsigned long started_waiting_at = millis();
-  bool timeout = false;
+  bool hasTimedOut = false;
   bool correctPacket = false;
-  bool available = false;
-  
+
   #ifdef DEBUG
   Serial.print("Waiting: ");
   #endif
-  while (!timeout && !correctPacket) {
-    available = radio.available();
-    if (available) {
-      radio.read( &data[0], 32 );
-      decryptPayload(data);
-      #ifdef DEBUG
-      printCharArray("Receiving", data, 32);
-      #endif
+  while (!hasTimedOut && !correctPacket) {
+    bool packetAvailable = readPacket(data);
+    if (packetAvailable) {
       correctPacket = (uint8_t)data[2] == type;
     }
-    timeout = millis() - started_waiting_at > 5000;
+    hasTimedOut = millis() - started_waiting_at > timeout;
   }
+  #ifdef DEBUG
+  if (!correctPacket) {
+    Serial.print("Failed;\n");
+  } else {
+    Serial.print("Success;\n");
+  }
+  #endif
   return correctPacket;
+}
+
+bool readPacket(char* data) {
+  bool available = radio.available();
+  bool goodPacket = false;
+  uint16_t receivedCounter = 0;
+  if (available) {
+    radio.read( &data[0], 32 );
+    decryptPayload(data);
+    receivedCounter = (data[0] << 8) | (data[31] & 0xFF);
+    uint8_t receivedMessageId = data[2];
+    #ifdef DEBUG
+      printCharArray("Receiving", data, 32);
+    #endif
+    if (receivedMessageId != 1) {
+        for (int i = 1; i < 11; i++) {
+            if (receivedCounter == serverCounter+i) {
+                goodPacket = true;
+                serverCounter += 1;
+            }
+        }
+    } else {
+        goodPacket = true;
+        serverCounter = receivedCounter;
+    }
+  }
+  return available && goodPacket;
 }
 
 bool sendPacket(uint8_t type, char* payload, uint8_t payloadSize) {
   char data[32] = "";
   char ackData[8] = "";
   uint8_t counter_low = myCounter & 0xFF;
-  uint8_t counter_high = myCounter  >> 8;
+  uint8_t counter_high = myCounter >> 8;
   uint64_t receivedServerId;
   bool success;
   memcpy(&data[0], &counter_high, 1);
@@ -145,6 +172,13 @@ bool sendPacket(uint8_t type, char* payload, uint8_t payloadSize) {
   radio.stopListening();
   success = radio.write( &data, 32 );
 
+  #ifdef DEBUG
+  if (!success) {
+    Serial.print("Failed;\n");
+  } else {
+     Serial.print("Success;\n");
+  }
+  #endif
   if (success) {
     myCounter++;
   }
@@ -157,7 +191,7 @@ bool sendPacket(uint8_t type, char* payload, uint8_t payloadSize) {
         Serial.print((long)receivedServerId);
         Serial.print(" - ");
         Serial.print((long)serverId);
-        Serial.print("\n");
+        Serial.print("; Unregistering;\n");
         #endif
         registered = false;
     }
@@ -176,7 +210,6 @@ void printCharArray(char* label, char* data, int length) {
       Serial.print((uint8_t)data[i], HEX);
       Serial.print(" ");
     }
-    Serial.print("\n");
 }
 #endif
 
