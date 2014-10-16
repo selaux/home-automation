@@ -135,7 +135,7 @@ bool readPacket(char* data) {
         for (int i = 1; i < 11; i++) {
             if (receivedCounter == serverCounter+i) {
                 goodPacket = true;
-                serverCounter += 1;
+                serverCounter = receivedCounter;
             }
         }
     } else {
