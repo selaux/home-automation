@@ -1,11 +1,13 @@
 """Handle radio connection with the nrf24 modules"""
 
 import os
+import logging
 try:
     from nrf24 import NRF24
 except(RuntimeError, ImportError) as error:
     if 'TEST_ENV' in os.environ:
-        print("Assuming test-environment")
+        LOGGER = logging.getLogger(__name__)
+        LOGGER.warn("Assuming test-environment")
         class NRF24:
             """This will be stubbed in tests"""
             def __init__(self):
@@ -20,6 +22,7 @@ from settings import SERVER_ADDRESS, SERVER_ID
 MAX_PAYLOAD_SIZE = 27
 MAX_UINT16 = 65535
 
+LOGGER = logging.getLogger(__name__)
 
 class Radio():
     """Wrapper around the nrf24 radio including client_id and crypto handling"""
@@ -45,7 +48,8 @@ class Radio():
         self.nrf24.openWritingPipe(self.server_address)
         self.nrf24.startListening()
 
-        self.nrf24.printDetails()
+        if LOGGER.isEnabledFor(logging.INFO):
+            self.nrf24.printDetails()
 
     def send_packet(self, client_id, packet_id, payload):
         """Send packet to a client"""
@@ -65,7 +69,7 @@ class Radio():
         success = self.nrf24.write(encrypted)
         self.nrf24.startListening()
         if not success:
-            print("Failed sending packet!")
+            LOGGER.info("Failed sending packet!")
         else:
             client['server_counter'] = client['server_counter']+1 if client['server_counter'] != MAX_UINT16 else 0
         return success

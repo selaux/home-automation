@@ -4,6 +4,7 @@ setup_test.setup()
 import unittest
 import radio
 import random
+import logging
 from mock import Mock, patch
 
 
@@ -45,6 +46,11 @@ class TestRadio(unittest.TestCase):
         radio.NRF24 = MockNRF24
         radio.SERVER_ADDRESS = self.mock_server_address
         radio.SERVER_ID = self.mock_server_id
+        logger = logging.getLogger()
+        for han in logger.handlers[:]:
+            logger.removeHandler(han)
+        for fil in logger.filters[:]:
+            logger.removeFilter(fil)
 
     def tearDown(self):
         radio.NRF24 = self.nrf_before
@@ -52,6 +58,7 @@ class TestRadio(unittest.TestCase):
         radio.SERVER_ID = self.server_id_before
 
     def test_init(self):
+        logging.basicConfig(level=logging.INFO)
         radio_instance = radio.Radio()
         radio_instance.nrf24.begin.assert_called_once_with(0, 0, 25, 24)
         radio_instance.nrf24.setRetries.assert_called_once_with(15, 15)
@@ -66,6 +73,12 @@ class TestRadio(unittest.TestCase):
         radio_instance.nrf24.openWritingPipe.assert_called_once_with(self.mock_server_address)
         radio_instance.nrf24.startListening.assert_called_once_with()
         radio_instance.nrf24.printDetails.assert_called_once_with()
+
+    def test_init_with_higher_loglevel(self):
+        logging.basicConfig(level=logging.WARN)
+        radio_instance = radio.Radio()
+        self.assertFalse(radio_instance.nrf24.printDetails.called)
+
 
     @patch.object(radio, 'encrypt_packet')
     def test_send_packet_with_success(self, encrypt_mock):

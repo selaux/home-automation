@@ -3,11 +3,13 @@
 import atexit
 import asyncio
 import os
+import logging
 try:
     import RPi.GPIO as GPIO
 except(RuntimeError, ImportError) as error:
     if 'TEST_ENV' in os.environ:
-        print("Assuming test-environment")
+        LOGGER = logging.getLogger(__name__)
+        LOGGER.warn("Assuming test-environment.")
         class GPIO:
             """This will be stubbed in tests"""
             def __init__(self):
