@@ -4,7 +4,8 @@ setup_test.setup()
 import unittest
 import gateway
 import random
-from mock import Mock
+from unittest.mock import MagicMock as Mock
+from unittest.mock import patch
 
 class TestGatewayMain(unittest.TestCase):
     radio = 'radio'
@@ -46,27 +47,13 @@ class TestGatewayMain(unittest.TestCase):
         self.loop_stub.close.assert_called_once_with()
 
 class TestGateway(unittest.TestCase):
-    def setUp(self):
-        self.gpio_before = gateway.GPIO
-        self.atexit_before = gateway.atexit
-        self.partial_before = gateway.partial
-        self.asyncio_before = gateway.asyncio
-        gateway.GPIO = Mock()
-        gateway.atexit = Mock()
-        gateway.asyncio = Mock()
-        gateway.partial = Mock()
-
-    def tearDown(self):
-        gateway.GPIO = self.gpio_before
-        gateway.atexit = self.atexit_before
-        gateway.partial = self.partial_before
-        gateway.asyncio = self.asyncio_before
-
+    @patch.multiple(gateway, GPIO=Mock(), atexit=Mock())
     def test_initialize_gpio(self):
         gateway.initialize_gpio()
         gateway.GPIO.setmode.assert_called_once_with(gateway.GPIO.BCM)
         gateway.atexit.register.assert_called_once_with(gateway.GPIO.cleanup)
 
+    @patch.multiple(gateway, partial=Mock(), asyncio=Mock())
     def test_poll_with_packet_available(self):
         expected_client_id = random.randint(1, 255)
         expected_message_id = random.randint(0, 255)
@@ -90,7 +77,7 @@ class TestGateway(unittest.TestCase):
         gateway.asyncio.async.assert_called_once_with('Future')
         loop.call_later.assert_called_once_with(0.04, 'PartiallyAppliedFn')
 
-
+    @patch.multiple(gateway, partial=Mock(), asyncio=Mock())
     def test_poll_without_packet_available(self):
         loop = Mock()
         radio = Mock()

@@ -5,7 +5,8 @@ import unittest
 import radio
 import random
 import logging
-from mock import Mock, patch
+from unittest.mock import MagicMock as Mock
+from unittest.mock import patch
 
 
 class MockNRF24():
@@ -33,30 +34,21 @@ class MockNRF24():
         self.available = Mock()
         self.writeAckPayload = Mock()
 
-class TestRadio(unittest.TestCase):
-    mock_server_address = [0x00, 0x00, 0x00, 0x00, 0x01]
-    mock_client_address = [0x00, 0x00, 0x00, 0x00, 0x02]
-    other_mock_client_address = [0x00, 0x00, 0x00, 0x00, 0x03]
-    mock_server_id = [1, 2, 3, 4, 5, 6, 7, 8]
+MOCK_SERVER_ADDRESS = [0x00, 0x00, 0x00, 0x00, 0x01]
+MOCK_CLIENT_ADDRESS = [0x00, 0x00, 0x00, 0x00, 0x02]
+OTHER_MOCK_CLIENT_ADDRESS = [0x00, 0x00, 0x00, 0x00, 0x03]
+MOCK_SERVER_ID = [1, 2, 3, 4, 5, 6, 7, 8]
 
+
+class TestRadio(unittest.TestCase):
     def setUp(self):
-        self.nrf_before = radio.NRF24
-        self.server_address_before = radio.SERVER_ADDRESS
-        self.server_id_before = radio.SERVER_ADDRESS
-        radio.NRF24 = MockNRF24
-        radio.SERVER_ADDRESS = self.mock_server_address
-        radio.SERVER_ID = self.mock_server_id
         logger = logging.getLogger()
         for han in logger.handlers[:]:
             logger.removeHandler(han)
         for fil in logger.filters[:]:
             logger.removeFilter(fil)
 
-    def tearDown(self):
-        radio.NRF24 = self.nrf_before
-        radio.SERVER_ADDRESS = self.server_address_before
-        radio.SERVER_ID = self.server_id_before
-
+    @patch.multiple(radio, NRF24=MockNRF24, SERVER_ADDRESS=MOCK_SERVER_ADDRESS)
     def test_init(self):
         logging.basicConfig(level=logging.INFO)
         radio_instance = radio.Radio()
@@ -69,17 +61,19 @@ class TestRadio(unittest.TestCase):
         radio_instance.nrf24.setCRCLength.assert_called_once_with(MockNRF24.CRC_16)
         radio_instance.nrf24.setAutoAck.assert_called_once_with(True)
         radio_instance.nrf24.enableAckPayload.assert_called_once_with()
-        radio_instance.nrf24.openReadingPipe.assert_called_once_with(1, self.mock_server_address)
-        radio_instance.nrf24.openWritingPipe.assert_called_once_with(self.mock_server_address)
+        radio_instance.nrf24.openReadingPipe.assert_called_once_with(1, MOCK_SERVER_ADDRESS)
+        radio_instance.nrf24.openWritingPipe.assert_called_once_with(MOCK_SERVER_ADDRESS)
         radio_instance.nrf24.startListening.assert_called_once_with()
         radio_instance.nrf24.printDetails.assert_called_once_with()
 
+    @patch.multiple(radio, NRF24=MockNRF24, SERVER_ADDRESS=MOCK_SERVER_ADDRESS)
     def test_init_with_higher_loglevel(self):
         logging.basicConfig(level=logging.WARN)
         radio_instance = radio.Radio()
         self.assertFalse(radio_instance.nrf24.printDetails.called)
 
 
+    @patch.multiple(radio, NRF24=MockNRF24, SERVER_ADDRESS=MOCK_SERVER_ADDRESS)
     @patch.object(radio, 'encrypt_packet')
     def test_send_packet_with_success(self, encrypt_mock):
         expected_packet = [39, 0, 5, 4, 1, 2, 3, 4]
@@ -88,7 +82,7 @@ class TestRadio(unittest.TestCase):
         radio_instance = radio.Radio()
         radio_instance.clients = [{
             'client_id': 1,
-            'address': self.mock_client_address,
+            'address': MOCK_CLIENT_ADDRESS,
             'server_counter': 10000
         }]
         radio_instance.nrf24.openReadingPipe.reset_mock()
@@ -103,18 +97,19 @@ class TestRadio(unittest.TestCase):
         self.assertEqual(encrypt_mock.call_args[0][0][:len(expected_packet)], expected_packet)
         self.assertEqual(encrypt_mock.call_args[0][0][-1], 16)
         radio_instance.nrf24.stopListening.assert_called_once_with()
-        radio_instance.nrf24.openReadingPipe.assert_called_once_with(1, self.mock_server_address)
-        radio_instance.nrf24.openWritingPipe.assert_called_once_with(self.mock_client_address)
+        radio_instance.nrf24.openReadingPipe.assert_called_once_with(1, MOCK_SERVER_ADDRESS)
+        radio_instance.nrf24.openWritingPipe.assert_called_once_with(MOCK_CLIENT_ADDRESS)
         radio_instance.nrf24.write.assert_called_once_with(encrypted_packet)
         radio_instance.nrf24.startListening.assert_called_once()
 
         self.assertEqual(success, True)
 
+    @patch.multiple(radio, NRF24=MockNRF24, SERVER_ADDRESS=MOCK_SERVER_ADDRESS)
     def test_send_packet_with_error(self):
         radio_instance = radio.Radio()
         radio_instance.clients = [{
             'client_id': 1,
-            'address': self.mock_client_address,
+            'address': MOCK_CLIENT_ADDRESS,
             'server_counter': 10000
         }]
         radio_instance.nrf24.write.return_value = False
@@ -123,6 +118,7 @@ class TestRadio(unittest.TestCase):
 
         self.assertEqual(success, False)
 
+    @patch.multiple(radio, NRF24=MockNRF24, SERVER_ADDRESS=MOCK_SERVER_ADDRESS)
     def setup_for_test_get_packet(self, decrypt_mock):
         radio_instance = radio.Radio()
         radio_instance.nrf24.available.return_value = True
@@ -139,6 +135,7 @@ class TestRadio(unittest.TestCase):
         decrypt_mock.return_value = bytes(decrypted_packet)
         return radio_instance
 
+    @patch.multiple(radio, NRF24=MockNRF24, SERVER_ADDRESS=MOCK_SERVER_ADDRESS)
     @patch.object(radio, 'decrypt_packet')
     def test_get_packet_with_a_packet_available(self, decrypt_mock):
         radio_instance = self.setup_for_test_get_packet(decrypt_mock)
@@ -154,6 +151,7 @@ class TestRadio(unittest.TestCase):
         radio_instance.has_client_id.assert_called_once_with(100)
         radio_instance.is_counter_is_in_expected_range.assert_called_once_with(100, 10000)
 
+    @patch.multiple(radio, NRF24=MockNRF24, SERVER_ADDRESS=MOCK_SERVER_ADDRESS)
     @patch.object(radio, 'decrypt_packet')
     def test_get_packet_with_a_packet_that_has_a_unknown_client_id(self, decrypt_mock):
         radio_instance = self.setup_for_test_get_packet(decrypt_mock)
@@ -161,6 +159,7 @@ class TestRadio(unittest.TestCase):
 
         self.assertEqual(radio_instance.get_packet(), False)
 
+    @patch.multiple(radio, NRF24=MockNRF24, SERVER_ADDRESS=MOCK_SERVER_ADDRESS)
     @patch.object(radio, 'decrypt_packet')
     def test_get_packet_with_a_packet_that_has_a_counter_that_is_not_in_the_expected_range(self, decrypt_mock):
         radio_instance = self.setup_for_test_get_packet(decrypt_mock)
@@ -168,6 +167,7 @@ class TestRadio(unittest.TestCase):
 
         self.assertEqual(radio_instance.get_packet(), False)
 
+    @patch.multiple(radio, NRF24=MockNRF24, SERVER_ADDRESS=MOCK_SERVER_ADDRESS)
     @patch.object(radio, 'decrypt_packet')
     def test_get_packet_without_a_packet_available(self, decrypt_mock):
         radio_instance = self.setup_for_test_get_packet(decrypt_mock)
@@ -175,9 +175,10 @@ class TestRadio(unittest.TestCase):
 
         self.assertEqual(radio_instance.get_packet(), False)
 
+    @patch.multiple(radio, NRF24=MockNRF24, SERVER_ADDRESS=MOCK_SERVER_ADDRESS)
     @patch.object(radio, 'decrypt_packet')
     def test_get_packet_with_registration_message(self, decrypt_mock):
-        address = self.mock_client_address
+        address = MOCK_CLIENT_ADDRESS
         expected_client_id = 100
         registration_message_id = 0
         radio_instance = self.setup_for_test_get_packet(decrypt_mock)
@@ -195,6 +196,7 @@ class TestRadio(unittest.TestCase):
         self.assertEqual(radio_instance.clients[0]['client_id'], expected_client_id)
         self.assertEqual(radio_instance.clients[0]['client_counter'], 10000)
 
+    @patch.multiple(radio, NRF24=MockNRF24, SERVER_ADDRESS=MOCK_SERVER_ADDRESS)
     def test_is_counter_in_expected_range(self):
         client_id = 100
         current_client_counter = 65533
@@ -215,6 +217,7 @@ class TestRadio(unittest.TestCase):
             with self.subTest(counter=counter, expected=expected):
                 self.assertEqual(radio_instance.is_counter_is_in_expected_range(client_id, counter), expected)
 
+    @patch.multiple(radio, NRF24=MockNRF24, SERVER_ADDRESS=MOCK_SERVER_ADDRESS)
     def test_has_client_id(self):
         client_id = 100
         test_cases = [
@@ -228,31 +231,34 @@ class TestRadio(unittest.TestCase):
                 radio_instance.clients = clients
                 self.assertEqual(radio_instance.has_client_id(client_id), expected)
 
+    @patch.multiple(radio, NRF24=MockNRF24, SERVER_ADDRESS=MOCK_SERVER_ADDRESS)
     def test_get_client_id_with_new_client_address(self):
         radio_instance = radio.Radio()
         number_already_registered = random.randint(0, 255)
 
         for i in range(number_already_registered):
-            radio_instance.clients.append({'client_id': i+1, 'address': self.other_mock_client_address})
+            radio_instance.clients.append({'client_id': i+1, 'address': OTHER_MOCK_CLIENT_ADDRESS})
 
-        self.assertEqual(radio_instance.get_client_id(self.mock_client_address), number_already_registered+1)
+        self.assertEqual(radio_instance.get_client_id(MOCK_CLIENT_ADDRESS), number_already_registered+1)
 
+    @patch.multiple(radio, NRF24=MockNRF24, SERVER_ADDRESS=MOCK_SERVER_ADDRESS)
     def test_get_client_id_with_existing_client_address(self):
         radio_instance = radio.Radio()
         expected_client_id = random.randint(1, 255)
 
-        radio_instance.clients.append({'client_id': expected_client_id, 'address': self.mock_client_address})
+        radio_instance.clients.append({'client_id': expected_client_id, 'address': MOCK_CLIENT_ADDRESS})
 
-        self.assertEqual(radio_instance.get_client_id(self.mock_client_address), expected_client_id)
+        self.assertEqual(radio_instance.get_client_id(MOCK_CLIENT_ADDRESS), expected_client_id)
 
+    @patch.multiple(radio, NRF24=MockNRF24, SERVER_ADDRESS=MOCK_SERVER_ADDRESS)
     def test_get_client_address_without_remaining_client_ids(self):
         radio_instance = radio.Radio()
         number_already_registered = 254
 
         for i in range(number_already_registered):
-            radio_instance.clients.append({'client_id': i+1, 'address': self.other_mock_client_address})
+            radio_instance.clients.append({'client_id': i+1, 'address': OTHER_MOCK_CLIENT_ADDRESS})
 
-        self.assertEqual(radio_instance.get_client_id(self.mock_client_address), False)
+        self.assertEqual(radio_instance.get_client_id(MOCK_CLIENT_ADDRESS), False)
 
 
 
