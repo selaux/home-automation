@@ -164,6 +164,7 @@ bool sendPacket(uint8_t type, char *payload, uint8_t payloadSize) {
     uint8_t counter_low = myCounter & 0xFF;
     uint8_t counter_high = myCounter >> 8;
     uint64_t receivedServerId;
+    char receivedChecksum;
     bool success;
     memcpy(&data[0], &counter_high, 1);
     memcpy(&data[1], &clientId, 1);
@@ -196,16 +197,45 @@ bool sendPacket(uint8_t type, char *payload, uint8_t payloadSize) {
     }
 
     if (radio.isAckPayloadAvailable()) {
-        radio.read(&receivedServerId, 8);
+        radio.read(&ackData[0], 8);
+        memcpy(&receivedServerId, &ackData[0], 8);
+        memcpy(&receivedChecksum, &ackData[7], 1);
         if (type != MESSAGE_REGISTER && receivedServerId != serverId) {
+            bool isCorruptedAckPayload = false;
+            char calculatedChecksum = 0;
+            for (int i = 0; i < 8; i++) {
+                calculatedChecksum = calculatedChecksum & 0xFF ^ (ackData[i] << i) & 0xFF;
+            }
+            if (receivedChecksum != calculatedChecksum) {
+                isCorruptedAckPayload = true;
+            }
+
+            if (!isCorruptedAckPayload) {
 #ifdef DEBUG
-            Serial.print("ACK Data: ");
-            Serial.print((long) receivedServerId);
-            Serial.print(" - ");
-            Serial.print((long) serverId);
-            Serial.print("; Unregistering;\n");
+                Serial.print("ACK Data: ");
+                Serial.print((long) receivedServerId);
+                Serial.print(" - ");
+                Serial.print((long) serverId);
+                Serial.print("; ");
+                Serial.print(receivedChecksum);
+                Serial.print(" - ");
+                Serial.print(calculatedChecksum);
+                Serial.print("; Unregistering;\n");
 #endif
-            registered = false;
+                registered = false;
+            } else {
+#ifdef DEBUG
+                Serial.print("Ignoring corrupted ACK-data.");
+                Serial.print("ACK Data: ");
+                Serial.print((long) receivedServerId);
+                Serial.print(" - ");
+                Serial.print((long) serverId);
+                Serial.print("; ");
+                Serial.print(receivedChecksum);
+                Serial.print(" - ");
+                Serial.println(calculatedChecksum);
+#endif
+            }
         }
     }
 

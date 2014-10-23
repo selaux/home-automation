@@ -9,7 +9,8 @@ from asyncio import Future
 from unittest.mock import MagicMock as Mock
 from unittest.mock import patch
 
-MOCK_SERVER_ID = [1, 2, 3, 4, 5, 6, 7, 8]
+MOCK_SERVER_ID = [1, 2, 3, 4, 5, 6, 7]
+MOCK_SERVER_CHECKSUM = 121
 
 
 class TestRouter(unittest.TestCase):
@@ -56,7 +57,7 @@ class TestRouter(unittest.TestCase):
         payload = bytes([1, 2, 3])
         expected_client_id = random.randint(1, 255)
         expected_packet_id = 1
-        expected_response = bytes([expected_client_id]) + bytes(MOCK_SERVER_ID)
+        expected_response = bytes([expected_client_id]) + bytes(MOCK_SERVER_ID) + bytes([MOCK_SERVER_CHECKSUM])
         router_instance = router.Router()
 
         yield from router_instance.handle_packet(expected_client_id,

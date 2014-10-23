@@ -3,6 +3,7 @@
 import asyncio
 import logging
 import asynqp
+from crypto import xor_checksum
 from struct import pack
 from settings import SERVER_ID, RABBITMQ_HOST, RABBITMQ_PORT, RABBITMQ_USERNAME, RABBITMQ_PASSWORD, \
     RABBITMQ_VIRTUAL_HOST
@@ -18,6 +19,7 @@ class Router():
 
     def __init__(self):
         self.server_id = SERVER_ID
+        self.server_id_checksum = xor_checksum(self.server_id)
         self.connection = None
         self.channel = None
         self.exchange = None
@@ -39,7 +41,7 @@ class Router():
         )
         self.channel = yield from self.connection.open_channel()
         self.channel.set_return_handler(log_returned_message)
-        self.exchange = yield from self.channel.declare_exchange(EXCHANGE, 'topic')
+        self.exchange = yield from self.channel.declare_exchange(EXCHANGE, 'fanout')
         self.queue = yield from self.channel.declare_queue(QUEUE)
 
     @asyncio.coroutine
@@ -47,6 +49,6 @@ class Router():
         """Handle a single packet from a nrf24 client"""
         LOGGER.info("Recieving message type {0} from client {1}".format(message_id, client_id))
         if message_id == PacketTypes.REGISTER:
-            response = pack('B8s', client_id, bytes(self.server_id))
+            response = pack('B7sB', client_id, bytes(self.server_id), self.server_id_checksum)
             yield from asyncio.sleep(0.02)
             send_packet(client_id, 1, response)

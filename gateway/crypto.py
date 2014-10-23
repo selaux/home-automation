@@ -29,3 +29,11 @@ def encrypt_packet(packet):
     encrypted_part1 = cipher.encrypt(intermediate_part1)
 
     return encrypted_part1 + encrypted_part2
+
+def xor_checksum(array):
+    """Calculate XOR Checksum for an array of bytes"""
+    result = 0
+    for index, value in enumerate(bytes(array)):
+        result = result & 0xFF ^ (value << index) & 0xFF
+    return result
+

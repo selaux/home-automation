@@ -37,7 +37,8 @@ class MockNRF24():
 MOCK_SERVER_ADDRESS = [0x00, 0x00, 0x00, 0x00, 0x01]
 MOCK_CLIENT_ADDRESS = [0x00, 0x00, 0x00, 0x00, 0x02]
 OTHER_MOCK_CLIENT_ADDRESS = [0x00, 0x00, 0x00, 0x00, 0x03]
-MOCK_SERVER_ID = [1, 2, 3, 4, 5, 6, 7, 8]
+MOCK_SERVER_ID = [1, 2, 3, 4, 5, 6, 7]
+MOCK_SERVER_CHECKSUM = 121
 
 
 class TestRadio(unittest.TestCase):
@@ -163,12 +164,15 @@ class TestRadio(unittest.TestCase):
 
         self.assertEqual(radio_instance.get_packet(), False)
 
-    @patch.multiple(radio, NRF24=MockNRF24, SERVER_ADDRESS=MOCK_SERVER_ADDRESS, decrypt_packet=Mock())
+    @patch.multiple(radio, NRF24=MockNRF24, SERVER_ID=MOCK_SERVER_ID, SERVER_ADDRESS=MOCK_SERVER_ADDRESS,
+                    decrypt_packet=Mock())
     def test_get_packet_without_a_packet_available(self):
+        expected_ack_payload = bytes(MOCK_SERVER_ID) + bytes([MOCK_SERVER_CHECKSUM])
         radio_instance = self.setup_for_test_get_packet()
         radio_instance.nrf24.available.return_value = False
 
         self.assertEqual(radio_instance.get_packet(), False)
+        radio_instance.nrf24.writeAckPayload.assert_called_once_with(1, expected_ack_payload, 8)
 
     @patch.multiple(radio, NRF24=MockNRF24, SERVER_ADDRESS=MOCK_SERVER_ADDRESS, decrypt_packet=Mock())
     def test_get_packet_with_registration_message(self):

@@ -16,7 +16,7 @@ except(RuntimeError, ImportError) as error:
         raise error
 from struct import pack, unpack
 from random import randint
-from crypto import decrypt_packet, encrypt_packet
+from crypto import decrypt_packet, encrypt_packet, xor_checksum
 from settings import SERVER_ADDRESS, SERVER_ID
 from constants import PacketTypes
 
@@ -31,7 +31,7 @@ class Radio():
     def __init__(self):
         """Setup the radio module"""
         self.server_address = SERVER_ADDRESS
-        self.server_id = SERVER_ID
+        self.server_id_checksum = xor_checksum(SERVER_ID)
         self.clients = []
 
         self.nrf24 = NRF24()
@@ -78,7 +78,7 @@ class Radio():
     def get_packet(self):
         """Get available packet from radio, if it is a registration packet handle it before passing on"""
         if not self.nrf24.available():
-            ack_payload = bytes(self.server_id)
+            ack_payload = bytes(SERVER_ID) + bytes([self.server_id_checksum])
             self.nrf24.writeAckPayload(1, ack_payload, 8)
             return False
 
