@@ -18,6 +18,7 @@ from struct import pack, unpack
 from random import randint
 from crypto import decrypt_packet, encrypt_packet
 from settings import SERVER_ADDRESS, SERVER_ID
+from constants import PacketTypes
 
 MAX_PAYLOAD_SIZE = 27
 MAX_UINT16 = 65535
@@ -90,7 +91,7 @@ class Radio():
         payload_length = min(payload_length, MAX_PAYLOAD_SIZE)
         payload = decrypted_packet[4:(4+payload_length)]
 
-        if message_id == 0:
+        if message_id == PacketTypes.REGISTER:
             client_id = self.handle_registration_message(received_counter, payload)
 
         if not self.has_client_id(client_id):

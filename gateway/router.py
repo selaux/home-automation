@@ -6,6 +6,7 @@ import asynqp
 from struct import pack
 from settings import SERVER_ID, RABBITMQ_HOST, RABBITMQ_PORT, RABBITMQ_USERNAME, RABBITMQ_PASSWORD, \
     RABBITMQ_VIRTUAL_HOST
+from constants import PacketTypes
 
 EXCHANGE = 'gateway.exchange'
 QUEUE = 'gateway.queue'
@@ -45,7 +46,7 @@ class Router():
     def handle_packet(self, client_id, message_id, dummy_payload, send_packet):
         """Handle a single packet from a nrf24 client"""
         LOGGER.info("Recieving message type {0} from client {1}".format(message_id, client_id))
-        if message_id == 0:
+        if message_id == PacketTypes.REGISTER:
             response = pack('B8s', client_id, bytes(self.server_id))
             yield from asyncio.sleep(0.02)
             send_packet(client_id, 1, response)
