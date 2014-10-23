@@ -44,7 +44,7 @@ void loop() {
     }
     delay(250);
     sendPacket(5, data, 4);
-    waitForPacket(6, received, 100);
+    waitForPacket(6, received, 500);
 }
 
 void setupRadio() {
@@ -66,37 +66,36 @@ void setupRadio() {
 #endif
 }
 
-void registerWithServer() {
+bool registerWithServer() {
     char received[32] = "";
     char payload[8] = "";
+    bool registerSuccess = false;
     memcpy(&payload[0], &listenAddress, 8);
 
-    while (!registered) {
 #ifdef DEBUG
-        Serial.print("Registering: ");
+    Serial.print("Registering: ");
 #endif
-        if (!sendPacket(MESSAGE_REGISTER, payload, 8)) {
-            delay(5000);
-        } else {
-            if (!waitForPacket(MESSAGE_REGISTER_ACK, received, 100)) {
+    if (sendPacket(MESSAGE_REGISTER, payload, 8)) {
+        if (waitForPacket(MESSAGE_REGISTER_ACK, received, 500)) {
+            clientId = (uint8_t) received[4];
+            memcpy(&serverId, &received[5], 8);
 #ifdef DEBUG
-                Serial.print("Failed Waiting;\n");
+            Serial.print("Success; ClientId: ");
+            Serial.print(clientId);
+            Serial.print("; ServerId: ");
+            Serial.print((long) serverId);
+            Serial.print(";\n");
 #endif
-                delay(5000);
-            } else {
-                clientId = (uint8_t) received[4];
-                memcpy(&serverId, &received[5], 8);
-#ifdef DEBUG
-                Serial.print("Success; ClientId: ");
-                Serial.print(clientId);
-                Serial.print("; ServerId: ");
-                Serial.print((long) serverId);
-                Serial.print(";\n");
-#endif
-                registered = true;
-            }
+            registerSuccess = true;
         }
     }
+#ifdef DEBUG
+    if (!registerSuccess) {
+        Serial.print("Failed Registering;\n");
+    }
+#endif
+    registered = registerSuccess;
+    return registered;
 }
 
 bool waitForPacket(uint8_t type, char *data, int timeout) {
