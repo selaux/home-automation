@@ -1,4 +1,5 @@
 import setup_test
+
 setup_test.setup()
 
 import unittest
@@ -7,44 +8,31 @@ import random
 from unittest.mock import MagicMock as Mock
 from unittest.mock import patch
 
+
 class TestGatewayMain(unittest.TestCase):
-    radio = 'radio'
-    router = 'router'
-
-    def setUp(self):
-        self.asyncio_before = gateway.asyncio
-        self.initialize_gpio_before = gateway.initialize_gpio
-        self.radio_before = gateway.Radio
-        self.router_before = gateway.Router
-        self.poll_before = gateway.poll
-        gateway.asyncio = Mock()
-        gateway.atexit = Mock()
-        gateway.initialize_gpio = Mock()
-        gateway.Radio = Mock()
-        gateway.Radio.return_value = self.radio
-        gateway.Radio.send_packet = {}
-        gateway.Router = Mock()
-        gateway.Router.return_value = self.router
-        gateway.poll = Mock()
-        self.loop_stub = Mock()
-        gateway.asyncio.get_event_loop.return_value = self.loop_stub
-
-    def tearDown(self):
-        gateway.asyncio = self.asyncio_before
-        gateway.initialize_gpio = self.initialize_gpio_before
-        gateway.Radio = self.radio_before
-        gateway.Router = self.router_before
-        gateway.poll = self.poll_before
-
+    @patch.multiple(gateway, asyncio=Mock(), atexit=Mock(), initialize_gpio=Mock(), Radio=Mock(), Router=Mock(),
+                    poll=Mock())
     def test_main(self):
+        loop_stub = Mock()
+        router_stub = Mock()
+        radio_stub = Mock()
+
+        gateway.Router.return_value = router_stub
+        gateway.Radio.return_value = radio_stub
+        gateway.Radio.send_packet = {}
+        gateway.asyncio.get_event_loop.return_value = loop_stub
+        router_stub.connect_to_message_queue.return_value = 'Future'
+
         gateway.main()
 
         gateway.initialize_gpio.assert_called_once_with()
-        gateway.Radio.assert_called_once_with()
         gateway.Router.assert_called_once_with()
-        gateway.poll.assert_called_once_with(self.loop_stub, self.radio, self.router)
-        self.loop_stub.run_forever.assert_called_once_with()
-        self.loop_stub.close.assert_called_once_with()
+        gateway.Radio.assert_called_once_with()
+        gateway.poll.assert_called_once_with(loop_stub, radio_stub, router_stub)
+        loop_stub.run_until_complete.assert_called_once_with('Future')
+        loop_stub.run_forever.assert_called_once_with()
+        loop_stub.close.assert_called_once_with()
+
 
 class TestGateway(unittest.TestCase):
     @patch.multiple(gateway, GPIO=Mock(), atexit=Mock())

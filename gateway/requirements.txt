@@ -1,4 +1,5 @@
 PyCrypto==2.6.1
 RPi.GPIO==0.5.7
+-e git://github.com/benjamin-hodgson/asynqp.git#egg=asynqp
 -e git://github.com/selaux/py-spidev.git#egg=spidev
 -e git://github.com/selaux/pynrf24.git#egg=nrf24

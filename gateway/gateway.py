@@ -37,11 +37,14 @@ def poll(loop, radio, router):
 
 def main():
     """Runs the gateway"""
+    loop = asyncio.get_event_loop()
+
+    router = Router()
+    loop.run_until_complete(router.connect_to_message_queue())
+
     initialize_gpio()
     radio = Radio()
-    router = Router()
 
-    loop = asyncio.get_event_loop()
     poll(loop, radio, router)
     try:
         loop.run_forever()
