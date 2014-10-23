@@ -4,6 +4,7 @@ python:
 install:
   - "pyvenv ./venv"
   - "source ./venv/bin/activate"
+  - "easy_install -U setuptools"
   - "pip install -r gateway/requirements.txt"
   - "pip install -r gateway/dev-requirements.txt"
 script:
