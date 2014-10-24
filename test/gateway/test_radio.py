@@ -54,7 +54,7 @@ class TestRadio(unittest.TestCase):
         logging.basicConfig(level=logging.INFO)
         radio_instance = radio.Radio()
         radio_instance.nrf24.begin.assert_called_once_with(0, 0, 25, 24)
-        radio_instance.nrf24.setRetries.assert_called_once_with(15, 15)
+        radio_instance.nrf24.setRetries.assert_called_once_with(10, 10)
         radio_instance.nrf24.setPayloadSize.assert_called_once_with(32)
         radio_instance.nrf24.setChannel.assert_called_once_with(0x4c)
         radio_instance.nrf24.setDataRate.assert_called_once_with(MockNRF24.BR_250KBPS)

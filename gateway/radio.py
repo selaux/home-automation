@@ -37,7 +37,7 @@ class Radio():
         self.nrf24 = NRF24()
         self.nrf24.begin(0, 0, 25, 24)
 
-        self.nrf24.setRetries(15, 15)
+        self.nrf24.setRetries(10, 10)
         self.nrf24.setPayloadSize(32)
         self.nrf24.setChannel(0x4c)
         self.nrf24.setDataRate(NRF24.BR_250KBPS)

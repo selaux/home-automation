@@ -49,7 +49,7 @@ void loop() {
 
 void setupRadio() {
     radio.begin();
-    radio.setRetries(15, 15);
+    radio.setRetries(10, 10);
     radio.setChannel(0x4c);
     radio.setDataRate(RF24_250KBPS);
     radio.setPALevel(RF24_PA_HIGH);
