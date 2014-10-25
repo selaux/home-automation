@@ -126,35 +126,45 @@ bool waitForPacket(uint8_t type, char *data, int timeout) {
 bool readPacket(char *data) {
     bool available = radio.available();
     bool goodPacket = false;
+    uint8_t client_id;
     uint16_t receivedCounter = 0;
     if (available) {
         radio.read(&data[0], 32);
         decryptPayload(data);
         receivedCounter = (data[0] << 8) | (data[31] & 0xFF);
+        client_id = data[1];
         uint8_t receivedMessageId = data[2];
 #ifdef DEBUG
         printCharArray("Receiving", data, 32);
 #endif
-        if (receivedMessageId != 1) {
-            for (int i = 1; i < 11; i++) {
-                if (receivedCounter == serverCounter + i) {
-                    goodPacket = true;
-                    serverCounter = receivedCounter;
+        if (client_id == 0) {
+            if (receivedMessageId != 1) {
+                for (int i = 1; i < 11; i++) {
+                    if (receivedCounter == serverCounter+i) {
+                        serverCounter = receivedCounter;
+                        goodPacket = true;
+                    }
                 }
-#ifdef DEBUG
-                if (!goodPacket) {
-                    Serial.print("Bad Counter: ");
-                    Serial.print(receivedCounter);
-                    Serial.print(" - ");
-                    Serial.print(serverCounter);
-                }
-#endif
+                #ifdef DEBUG
+                    if (!goodPacket) {
+                        Serial.print("Bad Counter: ");
+                        Serial.print(receivedCounter);
+                        Serial.print(" - ");
+                        Serial.print(serverCounter);
+                    }
+                #endif
+            } else {
+                goodPacket = true;
             }
         } else {
-            goodPacket = true;
-            serverCounter = receivedCounter;
+            goodPacket = false;
         }
     }
+
+    if (goodPacket) {
+        serverCounter = receivedCounter;
+    }
+
     return available && goodPacket;
 }
 
