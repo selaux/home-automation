@@ -3,6 +3,7 @@
 #include <SPI.h>
 #include "RF24.h"
 #include "AESLib.h"
+#include "types.h"
 #ifdef DEBUG
 #include "printf.h"
 #endif
@@ -11,6 +12,7 @@
 const uint8_t key[] = {25, 123, 90, 174, 198, 145, 40, 33, 98, 90, 90, 111, 78, 65, 184, 188};
 uint16_t myCounter = 0;
 uint16_t serverCounter = 0;
+HandlerPointer *subscriptionHandlers = NULL;
 
 RF24 radio(9, 10);
 const uint64_t serverAddress = 0xF0F0F0F0E1LL;
@@ -22,50 +24,12 @@ uint8_t clientId = 0;
 const uint8_t MAX_PAYLOAD_SIZE = 27;
 const uint8_t MESSAGE_REGISTER = 0;
 const uint8_t MESSAGE_REGISTER_ACK = 1;
+const uint8_t MESSAGE_SUB_CHANNEL = 3;
+const uint8_t MESSAGE_PUB = 4;
 
 bool registered = false;
 
-void setup() {
-#ifdef DEBUG
-    Serial.begin(57600);
-    printf_begin();
-#endif
-    setupRadio();
-    delay(100);
-    randomSeed(analogRead(0));
-    myCounter = random(0, 65535);
-}
-
-void loop() {
-    char data[4] = {0x12, 0x11, 0x10, 0x09};
-    char received[32] = "";
-    if (!registered) {
-        registerWithServer();
-    }
-    delay(250);
-    sendPacket(5, data, 4);
-    waitForPacket(6, received, 500);
-}
-
-void setupRadio() {
-    radio.begin();
-    radio.setRetries(10, 10);
-    radio.setChannel(0x4c);
-    radio.setDataRate(RF24_250KBPS);
-    radio.setPALevel(RF24_PA_HIGH);
-    radio.setCRCLength(RF24_CRC_16);
-    radio.setAutoAck(true);
-    radio.enableDynamicPayloads();
-    radio.enableAckPayload();
-
-    radio.openWritingPipe(serverAddress);
-    radio.openReadingPipe(1, listenAddress);
-    radio.startListening();
-#ifdef DEBUG
-    radio.printDetails();
-#endif
-}
-
+// Future public methods
 bool registerWithServer() {
     char received[32] = "";
     char payload[8] = "";
@@ -87,6 +51,9 @@ bool registerWithServer() {
             Serial.print(";\n");
 #endif
             registerSuccess = true;
+            if (subscriptionHandlers != NULL) {
+                subscriptionHandlers = (HandlerPointer*) realloc(subscriptionHandlers, 0);
+            }
         }
     }
 #ifdef DEBUG
@@ -96,6 +63,117 @@ bool registerWithServer() {
 #endif
     registered = registerSuccess;
     return registered;
+}
+
+uint8_t subscribe(char* routingKey, uint8_t routingKeyLength, uint8_t transformId, HandlerPointer handler) {
+    int channelId = 0,
+        handlerSize = sizeof(HandlerPointer);
+    char payload[32] = "",
+         currentHandlerListSize = 0;
+
+    if (subscriptionHandlers != NULL) {
+        currentHandlerListSize = sizeof(subscriptionHandlers) / handlerSize;
+    }
+
+    memcpy(&payload[0], &currentHandlerListSize, 1);
+    memcpy(&payload[1], &transformId, 1);
+    memcpy(&payload[2], &routingKey[0], routingKeyLength);
+
+    if (sendPacket(MESSAGE_SUB_CHANNEL, payload, routingKeyLength+2)) {
+        if (subscriptionHandlers == NULL) {
+            subscriptionHandlers = (HandlerPointer*) malloc(handlerSize);
+            subscriptionHandlers[0] = handler;
+            channelId = 0;
+        } else {
+            subscriptionHandlers = (HandlerPointer*) realloc(subscriptionHandlers, (currentHandlerListSize+1) * handlerSize);
+            subscriptionHandlers[currentHandlerListSize] = handler;
+            channelId = currentHandlerListSize;
+        }
+    }
+
+    return channelId;
+}
+
+void poll() {
+    char received[32] = "";
+    int  handlerSize = sizeof(void (*)(char*, uint8_t)),
+         currentHandlerListSize = sizeof(subscriptionHandlers) / handlerSize;
+
+    if (readPacket(received)) {
+        uint8_t messageType = received[2];
+        if (messageType == MESSAGE_PUB) {
+            uint8_t channel = received[4];
+            uint8_t payloadSize = received[3];
+            if (channel < currentHandlerListSize) {
+                Serial.print("\nCalling Handler Number ");
+                Serial.print(channel);
+                Serial.print("\n");
+                (*subscriptionHandlers[channel])(received, payloadSize);
+            }
+        }
+    }
+}
+
+unsigned long lastSend;
+
+void setup() {
+#ifdef DEBUG
+    Serial.begin(57600);
+    printf_begin();
+#endif
+    setupRadio();
+    delay(100);
+    randomSeed(analogRead(0));
+    myCounter = random(0, 65535);
+    lastSend = millis();
+}
+
+void loop() {
+    char data[4] = {0x12, 0x11, 0x10, 0x09};
+    char received[32] = "";
+    unsigned long now = millis();
+
+    if (!registered) {
+        if (now - lastSend > 150) {
+            Serial.println("Registering");
+            registerWithServer();
+            subscribe("gateway.pong", 12, 1, handlePong);
+            lastSend = now;
+            Serial.println(registered);
+        }
+    } else {
+        if (now - lastSend > 150) {
+            if (sendPacket(5, data, 4)) {
+                lastSend = now;
+            }
+        }
+    }
+    poll();
+}
+
+void handlePong(char* payload, uint8_t payloadSize) {
+    Serial.println("Pong received!");
+}
+
+// Future private methods
+
+void setupRadio() {
+    radio.begin();
+    radio.setRetries(10, 10);
+    radio.setChannel(0x4c);
+    radio.setDataRate(RF24_250KBPS);
+    radio.setPALevel(RF24_PA_HIGH);
+    radio.setCRCLength(RF24_CRC_16);
+    radio.setAutoAck(true);
+    radio.enableDynamicPayloads();
+    radio.enableAckPayload();
+
+    radio.openWritingPipe(serverAddress);
+    radio.openReadingPipe(1, listenAddress);
+    radio.startListening();
+#ifdef DEBUG
+    radio.printDetails();
+#endif
 }
 
 bool waitForPacket(uint8_t type, char *data, int timeout) {

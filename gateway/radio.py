@@ -64,6 +64,8 @@ class Radio():
         packed = pack('BBBB27sB', counter_bytes[1], 0, packet_id, payload_size, bytes(padded_packet), counter_bytes[0])
         encrypted = encrypt_packet(bytes(packed))
 
+        LOGGER.info("Sending packet type {0} to client {1}".format(packet_id, client_id))
+
         self.nrf24.stopListening()
         self.nrf24.openReadingPipe(1, self.server_address)
         self.nrf24.openWritingPipe(address)

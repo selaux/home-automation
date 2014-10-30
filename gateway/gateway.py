@@ -31,7 +31,7 @@ def poll(loop, radio, router):
     packet = radio.get_packet()
     if packet:
         client_id, message_id, payload = packet
-        asyncio.async(router.handle_packet(client_id, message_id, payload, radio.send_packet))
+        asyncio.async(router.handle_packet(client_id, message_id, payload))
 
     loop.call_later(0.04, partial(poll, loop, radio, router))
 
@@ -44,6 +44,8 @@ def main():
 
     initialize_gpio()
     radio = Radio()
+
+    router.set_send_packet(radio.send_packet)
 
     poll(loop, radio, router)
     try:

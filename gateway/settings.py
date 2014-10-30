@@ -11,6 +11,7 @@ SERVER_ADDRESS = [0xf0, 0xf0, 0xf0, 0xf0, 0xe1]
 SERVER_ID = [random.randint(0, 255) for dummy in range(7)]
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s;%(name)s;%(levelname)s;%(message)s')
+# logging.basicConfig(filename='/var/log/home-automation.log', level=logging.INFO)
 
 RABBITMQ_HOST = 'localhost'
 RABBITMQ_PORT = 5672

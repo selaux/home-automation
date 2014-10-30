@@ -26,10 +26,14 @@ class TestGatewayMain(unittest.TestCase):
         gateway.main()
 
         gateway.initialize_gpio.assert_called_once_with()
-        gateway.Router.assert_called_once_with()
         gateway.Radio.assert_called_once_with()
-        gateway.poll.assert_called_once_with(loop_stub, radio_stub, router_stub)
+
+        gateway.Router.assert_called_once_with()
         loop_stub.run_until_complete.assert_called_once_with('Future')
+        router_stub.set_send_packet.assert_called_once_with(radio_stub.send_packet)
+
+        gateway.poll.assert_called_once_with(loop_stub, radio_stub, router_stub)
+
         loop_stub.run_forever.assert_called_once_with()
         loop_stub.close.assert_called_once_with()
 
@@ -60,8 +64,7 @@ class TestGateway(unittest.TestCase):
         router.handle_packet.assert_called_once_with(
             expected_client_id,
             expected_message_id,
-            expected_payload,
-            radio.send_packet)
+            expected_payload)
         gateway.asyncio.async.assert_called_once_with('Future')
         loop.call_later.assert_called_once_with(0.04, 'PartiallyAppliedFn')
 
