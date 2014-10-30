@@ -116,8 +116,10 @@ class Router():
                 msg = asynqp.Message(transform.to_message(payload))
                 self.exchange.publish(msg, routing_key)
             else:
-                log_msg = 'Client {0} tried to publish message with unknown channel {1}'.format(client_id, channel_id)
-                LOGGER.warning(log_msg)
+                LOGGER.warning('Client {0} tried to publish message with unknown channel {1}'.format(
+                    client_id,
+                    channel_id
+                ))
         else:
             LOGGER.warning('Client {0} tried to publish, but has no channels set up'.format(client_id))
 
@@ -129,11 +131,18 @@ class Router():
             'channel_id': channel_id,
             'transform_id': transform_id
         }
-        if routing_key in self.subscription_channels:
-            self.subscription_channels[routing_key].append(subscription)
+        if transform_id in self.transforms:
+            if routing_key in self.subscription_channels:
+                self.subscription_channels[routing_key].append(subscription)
+            else:
+                self.subscription_channels[routing_key] = [subscription]
+            yield from self.queue.bind(self.exchange, routing_key)
         else:
-            self.subscription_channels[routing_key] = [subscription]
-        yield from self.queue.bind(self.exchange, routing_key)
+            LOGGER.warning('Client {0} tried to register sub-channel {1} with unknown transform {2}'.format(
+                client_id,
+                channel_id,
+                transform_id
+            ))
 
     def clear_subscription_channels(self, client_id):
         """Clear all subscriptions for a client after new registration"""
@@ -143,15 +152,22 @@ class Router():
 
     def add_publish_channel(self, client_id, routing_key, channel_id, transform_id):
         """Add a publish_channel object so later packets can be routed correctly"""
-        publish_channel = {
-            'routing_key': routing_key,
-            'channel_id': channel_id,
-            'transform_id': transform_id
-        }
-        if client_id in self.publish_channels:
-            self.publish_channels[client_id].append(publish_channel)
+        if transform_id in self.transforms:
+            publish_channel = {
+                'routing_key': routing_key,
+                'channel_id': channel_id,
+                'transform_id': transform_id
+            }
+            if client_id in self.publish_channels:
+                self.publish_channels[client_id].append(publish_channel)
+            else:
+                self.publish_channels[client_id] = [publish_channel]
         else:
-            self.publish_channels[client_id] = [publish_channel]
+            LOGGER.warning('Client {0} tried to register pub-channel {1} with unknown transform {2}'.format(
+                client_id,
+                channel_id,
+                transform_id
+            ))
 
     def clear_publish_channels(self, client_id):
         """Clear all publish channels for a client after a new registration"""

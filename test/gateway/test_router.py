@@ -199,6 +199,7 @@ class TestRouter(unittest.TestCase):
         }
 
         router_instance = router.Router()
+        router_instance.transforms[3] = Mock()
         router_instance.add_publish_channel(1, 'foo.routing.key', 2, 3)
 
         self.assertEqual(router_instance.publish_channels, expected_publish_channels)
@@ -217,10 +218,27 @@ class TestRouter(unittest.TestCase):
         }
 
         router_instance = router.Router()
+        router_instance.transforms[3] = Mock()
         router_instance.publish_channels = publish_channels_before
         router_instance.add_publish_channel(1, 'bar.routing.key', 2, 3)
 
         self.assertEqual(router_instance.publish_channels, expected_publish_channels)
+
+    def test_add_publish_channel_with_unknown_transform_id(self):
+        client_id = 99
+        channel_id = 1
+        transform_id = 100
+
+        router_instance = router.Router()
+
+        with self.assertLogs(router.LOGGER) as log_messages:
+            router_instance.add_publish_channel(client_id, 'bar.routing.key', channel_id, transform_id)
+
+        log_messages = log_messages.output
+        self.assertIn(
+            'WARNING:router:Client 99 tried to register pub-channel 1 with unknown transform 100',
+            log_messages
+        )
 
     def test_clear_publish_channels(self):
         publish_channels_before = {
@@ -253,6 +271,7 @@ class TestRouter(unittest.TestCase):
         }
 
         router_instance = router.Router()
+        router_instance.transforms[3] = Mock()
         router_instance.queue = Mock()
         router_instance.exchange = Mock()
         yield from router_instance.add_subscription_channel(1, 'foo.routing.key', 2, 3)
@@ -275,6 +294,7 @@ class TestRouter(unittest.TestCase):
         }
 
         router_instance = router.Router()
+        router_instance.transforms[3] = Mock()
         router_instance.queue = Mock()
         router_instance.exchange = Mock()
         router_instance.subscription_channels = subscription_channels_before
@@ -282,6 +302,23 @@ class TestRouter(unittest.TestCase):
 
         self.assertEqual(router_instance.subscription_channels, expected_subscription_channels)
         router_instance.queue.bind.assert_called_once_with(router_instance.exchange, 'foo.routing.key')
+
+    @setup_test.async_test
+    def test_add_subscription_channel_with_unknown_transform_id(self):
+        client_id = 99
+        channel_id = 1
+        transform_id = 100
+
+        router_instance = router.Router()
+
+        with self.assertLogs(router.LOGGER) as log_messages:
+            yield from router_instance.add_subscription_channel(client_id, 'bar.routing.key', channel_id, transform_id)
+
+        log_messages = log_messages.output
+        self.assertIn(
+            'WARNING:router:Client 99 tried to register sub-channel 1 with unknown transform 100',
+            log_messages
+        )
 
     def test_clear_subscription_channels(self):
         subscription_channels_before = {
