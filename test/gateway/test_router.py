@@ -60,6 +60,7 @@ class TestRouter(unittest.TestCase):
         expected_response = bytes([expected_client_id]) + bytes(MOCK_SERVER_ID) + bytes([MOCK_SERVER_CHECKSUM])
         router_instance = router.Router()
         router_instance.clear_subscription_channels = Mock()
+        router_instance.clear_publish_channels = Mock()
         router_instance.set_send_packet(self.send_packet_stub)
 
         yield from router_instance.handle_packet(expected_client_id,
@@ -68,9 +69,10 @@ class TestRouter(unittest.TestCase):
 
         self.send_packet_stub.assert_called_once_with(expected_client_id, expected_packet_id, expected_response)
         router_instance.clear_subscription_channels.assert_called_once_with(expected_client_id)
+        router_instance.clear_publish_channels.assert_called_once_with(expected_client_id)
 
     @setup_test.async_test
-    def test_it_should_handle_a_subscription_packet(self):
+    def test_it_should_handle_a_subscription_channel_packet(self):
         subscription_packet_id = 3
         expected_channel_id = random.randint(1, 255)
         expected_transform_id = random.randint(1, 255)
@@ -90,6 +92,81 @@ class TestRouter(unittest.TestCase):
             expected_channel_id,
             expected_transform_id
         )
+
+    @setup_test.async_test
+    def test_it_should_handle_a_publish_channel_packet(self):
+        subscription_packet_id = 2
+        expected_channel_id = random.randint(1, 255)
+        expected_transform_id = random.randint(1, 255)
+        expected_routing_key = 'test:routing:key'
+        payload = bytes([expected_channel_id, expected_transform_id]) + bytes(expected_routing_key, encoding='ascii')
+        expected_client_id = random.randint(1, 255)
+        router_instance = router.Router()
+        router_instance.add_publish_channel = Mock()
+
+        yield from router_instance.handle_packet(expected_client_id,
+                                                 subscription_packet_id,
+                                                 payload)
+
+        router_instance.add_publish_channel.assert_called_once_with(
+            expected_client_id,
+            expected_routing_key,
+            expected_channel_id,
+            expected_transform_id
+        )
+
+    def test_add_publish_channel_with_new_client_id(self):
+        expected_publish_channels = {
+            1: [
+                {'routing_key': 'foo.routing.key', 'channel_id': 2, 'transform_id': 3}
+            ]
+        }
+
+        router_instance = router.Router()
+        router_instance.add_publish_channel(1, 'foo.routing.key', 2, 3)
+
+        self.assertEqual(router_instance.publish_channels, expected_publish_channels)
+
+    def test_add_publish_channel_with_existing_client_id(self):
+        publish_channels_before = {
+            1: [
+                {'routing_key': 'foo.routing.key', 'channel_id': 0, 'transform_id': 0}
+            ]
+        }
+        expected_publish_channels = {
+            1: [
+                {'routing_key': 'foo.routing.key', 'channel_id': 0, 'transform_id': 0},
+                {'routing_key': 'bar.routing.key', 'channel_id': 2, 'transform_id': 3}
+            ]
+        }
+
+        router_instance = router.Router()
+        router_instance.publish_channels = publish_channels_before
+        router_instance.add_publish_channel(1, 'bar.routing.key', 2, 3)
+
+        self.assertEqual(router_instance.publish_channels, expected_publish_channels)
+
+    def test_clear_publish_channels(self):
+        publish_channels_before = {
+            1: [
+                {'routing_key': 'foo.routing.key', 'channel_id': 0, 'transform_id': 0},
+                {'routing_key': 'bar.routing.key', 'channel_id': 1, 'transform_id': 1}
+            ],
+            2: [
+                {'routing_key': 'baz.routing.key', 'channel_id': 1, 'transform_id': 1}
+            ]
+        }
+        expected_subscription_channels = {
+            2: [
+                {'routing_key': 'baz.routing.key', 'channel_id': 1, 'transform_id': 1}
+            ]
+        }
+
+        router_instance = router.Router()
+        router_instance.publish_channels = publish_channels_before
+        router_instance.clear_publish_channels(1)
+
+        self.assertEqual(router_instance.publish_channels, expected_subscription_channels)
 
     @setup_test.async_test
     def test_add_subscription_channel_with_new_routing_key(self):

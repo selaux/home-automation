@@ -28,6 +28,7 @@ class Router():
         self.consumer = None
         self.send_packet = None
         self.subscription_channels = {}
+        self.publish_channels = {}
 
     def set_send_packet(self, send_packet):
         """Set the function to send a packet over the radio"""
@@ -59,6 +60,8 @@ class Router():
         LOGGER.info("Recieving packet type {0} from client {1}".format(message_id, client_id))
         if message_id == PacketTypes.REGISTER:
             yield from self.handle_register_packet(client_id)
+        if message_id == PacketTypes.PUB_CHANNEL:
+            yield from self.handle_pub_channel_packet(client_id, payload)
         if message_id == PacketTypes.SUB_CHANNEL:
             yield from self.handle_sub_channel_packet(client_id, payload)
         if message_id == 5:
@@ -70,17 +73,30 @@ class Router():
         """Handle registration packet"""
         response = pack('B7sB', client_id, bytes(SERVER_ID), SERVER_ID_CHECKSUM)
         self.clear_subscription_channels(client_id)
+        self.clear_publish_channels(client_id)
         if self.send_packet:
             yield from asyncio.sleep(0.02)
             self.send_packet(client_id, PacketTypes.REGISTER_SERVER_ACK, response)
 
-    @asyncio.coroutine
-    def handle_sub_channel_packet(self, client_id, payload):
-        """Handle packet for subscription to a routing key"""
+    @staticmethod
+    def extract_channel_packet_data(payload):
+        """Extract payload data from pub- and sub-channel packets"""
         payload_size = len(payload)
         routing_key_length = str((payload_size-2))
         channel_id, transform_id = unpack('BB', payload[:2])
         routing_key = unpack(routing_key_length + 's', payload[2:])[0].decode('ascii')
+        return routing_key, channel_id, transform_id
+
+    @asyncio.coroutine
+    def handle_pub_channel_packet(self, client_id, payload):
+        """Handle packet for creating a publish channel for a routing key"""
+        routing_key, channel_id, transform_id = self.extract_channel_packet_data(payload)
+        yield from self.add_publish_channel(client_id, routing_key, channel_id, transform_id)
+
+    @asyncio.coroutine
+    def handle_sub_channel_packet(self, client_id, payload):
+        """Handle packet for a subscription channel to a routing key"""
+        routing_key, channel_id, transform_id = self.extract_channel_packet_data(payload)
         yield from self.add_subscription_channel(client_id, routing_key, channel_id, transform_id)
 
     @asyncio.coroutine
@@ -102,6 +118,23 @@ class Router():
         for routing_key in self.subscription_channels:
             subscriptions = self.subscription_channels[routing_key]
             self.subscription_channels[routing_key] = [s for s in subscriptions if s['client_id'] != client_id]
+
+    def add_publish_channel(self, client_id, routing_key, channel_id, transform_id):
+        """Add a publish_channel object so later packets can be routed correctly"""
+        publish_channel = {
+            'routing_key': routing_key,
+            'channel_id': channel_id,
+            'transform_id': transform_id
+        }
+        if client_id in self.publish_channels:
+            self.publish_channels[client_id].append(publish_channel)
+        else:
+            self.publish_channels[client_id] = [publish_channel]
+
+    def clear_publish_channels(self, client_id):
+        """Clear all publish channels for a client after a new registration"""
+        if client_id in self.publish_channels:
+            self.publish_channels.pop(client_id)
 
     def handle_message(self, message):
         """Handle message coming from rabbitmq"""

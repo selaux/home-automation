@@ -9,3 +9,6 @@ disable=import-error,no-name-in-module,too-few-public-methods,maybe-no-member
 
 [FORMAT]
 max-line-length=120
+
+[DESIGN]
+max-attributes=10
