@@ -7,6 +7,7 @@ from crypto import xor_checksum
 from struct import pack, unpack
 from settings import SERVER_ID, RABBITMQ_HOST, RABBITMQ_PORT, RABBITMQ_USERNAME, RABBITMQ_PASSWORD, \
     RABBITMQ_VIRTUAL_HOST
+from transforms import SwitchTransform
 from constants import PacketTypes
 
 SERVER_ID_CHECKSUM = xor_checksum(SERVER_ID)
@@ -29,6 +30,12 @@ class Router():
         self.send_packet = None
         self.subscription_channels = {}
         self.publish_channels = {}
+        self.transforms = {}
+        self.register_transform(0, SwitchTransform)
+
+    def register_transform(self, transform_id, transform_class):
+        """Register a new transform class with the gateway"""
+        self.transforms[transform_id] = transform_class
 
     def set_send_packet(self, send_packet):
         """Set the function to send a packet over the radio"""
@@ -64,9 +71,8 @@ class Router():
             yield from self.handle_pub_channel_packet(client_id, payload)
         if message_id == PacketTypes.SUB_CHANNEL:
             yield from self.handle_sub_channel_packet(client_id, payload)
-        if message_id == 5:
-            msg = asynqp.Message({'pong': 'content'})
-            self.exchange.publish(msg, 'gateway.pong')
+        if message_id == PacketTypes.PUB:
+            self.handle_pub_packet(client_id, payload)
 
     @asyncio.coroutine
     def handle_register_packet(self, client_id):
@@ -98,6 +104,22 @@ class Router():
         """Handle packet for a subscription channel to a routing key"""
         routing_key, channel_id, transform_id = self.extract_channel_packet_data(payload)
         yield from self.add_subscription_channel(client_id, routing_key, channel_id, transform_id)
+
+    def handle_pub_packet(self, client_id, payload):
+        """Route publish packet from client to message queue"""
+        if client_id in self.publish_channels:
+            channel_id, = unpack('B', payload[:1])
+            channel = next((c for c in self.publish_channels[client_id] if c['channel_id'] == channel_id), None)
+            if channel:
+                transform = self.transforms[channel['transform_id']]
+                routing_key = channel['routing_key']
+                msg = asynqp.Message(transform.to_message(payload))
+                self.exchange.publish(msg, routing_key)
+            else:
+                log_msg = 'Client {0} tried to publish message with unknown channel {1}'.format(client_id, channel_id)
+                LOGGER.warning(log_msg)
+        else:
+            LOGGER.warning('Client {0} tried to publish, but has no channels set up'.format(client_id))
 
     @asyncio.coroutine
     def add_subscription_channel(self, client_id, routing_key, channel_id, transform_id):

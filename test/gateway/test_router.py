@@ -5,6 +5,7 @@ setup_test.setup()
 import unittest
 import router
 import random
+import transforms
 from asyncio import Future
 from unittest.mock import MagicMock as Mock
 from unittest.mock import patch
@@ -16,6 +17,13 @@ MOCK_SERVER_CHECKSUM = 121
 class TestRouter(unittest.TestCase):
     def setUp(self):
         self.send_packet_stub = Mock()
+
+    def test_transform_registration(self):
+        expected_transforms = {
+            0: transforms.SwitchTransform
+        }
+        router_instance = router.Router()
+        self.assertEqual(router_instance.transforms, expected_transforms)
 
     @patch.multiple(router, asynqp=Mock(), RABBITMQ_HOST='a', RABBITMQ_PORT=1, RABBITMQ_USERNAME='b',
                     RABBITMQ_PASSWORD='c', RABBITMQ_VIRTUAL_HOST='d')
@@ -114,6 +122,74 @@ class TestRouter(unittest.TestCase):
             expected_channel_id,
             expected_transform_id
         )
+
+    @setup_test.async_test
+    def test_it_should_handle_a_publish_packet(self):
+        publish_packet_id = 4
+        client_id = random.randint(1, 255)
+        channel_id = random.randint(1, 255)
+        transform_id = random.randint(1, 255)
+        expected_routing_key = 'test:routing:key'
+        expected_message = {'foo': 'bar'}
+        payload = bytes([channel_id]) + bytes([1, 2, 3, 4])
+        transform_mock = Mock()
+        transform_mock.to_message.return_value = expected_message
+
+        router_instance = router.Router()
+        router_instance.exchange = Mock()
+        router_instance.transforms[transform_id] = transform_mock
+        router_instance.publish_channels = {
+            client_id: [
+                {'channel_id': channel_id, 'transform_id': transform_id, 'routing_key': expected_routing_key}
+            ]
+        }
+
+        yield from router_instance.handle_packet(client_id,
+                                                 publish_packet_id,
+                                                 payload)
+
+        router_instance.exchange.publish.assert_called_once()
+        message = router_instance.exchange.publish.call_args[0][0]
+        routing_key = router_instance.exchange.publish.call_args[0][1]
+        self.assertEqual(message.json(), expected_message)
+        self.assertEqual(routing_key, expected_routing_key)
+
+    @setup_test.async_test
+    def test_it_should_handle_a_publish_packet_with_unknown_client_id(self):
+        publish_packet_id = 4
+        client_id = 99
+        channel_id = random.randint(1, 255)
+        payload = bytes([channel_id]) + bytes([1, 2, 3, 4])
+
+        router_instance = router.Router()
+
+        with self.assertLogs(router.LOGGER) as log_messages:
+            yield from router_instance.handle_packet(client_id,
+                                                     publish_packet_id,
+                                                     payload)
+
+        log_messages = log_messages.output
+        self.assertIn('WARNING:router:Client 99 tried to publish, but has no channels set up', log_messages)
+
+    @setup_test.async_test
+    def test_it_should_handle_a_publish_packet_with_unknown_channel_id(self):
+        publish_packet_id = 4
+        client_id = 99
+        channel_id = 100
+        payload = bytes([channel_id]) + bytes([1, 2, 3, 4])
+
+        router_instance = router.Router()
+        router_instance.publish_channels = {
+            client_id: []
+        }
+
+        with self.assertLogs(router.LOGGER) as log_messages:
+            yield from router_instance.handle_packet(client_id,
+                                                     publish_packet_id,
+                                                     payload)
+
+        log_messages = log_messages.output
+        self.assertIn('WARNING:router:Client 99 tried to publish message with unknown channel 100', log_messages)
 
     def test_add_publish_channel_with_new_client_id(self):
         expected_publish_channels = {
