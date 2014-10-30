@@ -27,7 +27,7 @@ class Router():
         self.queue = None
         self.consumer = None
         self.send_packet = None
-        self.subscriptions = {}
+        self.subscription_channels = {}
 
     def set_send_packet(self, send_packet):
         """Set the function to send a packet over the radio"""
@@ -60,7 +60,7 @@ class Router():
         if message_id == PacketTypes.REGISTER:
             yield from self.handle_register_packet(client_id)
         if message_id == PacketTypes.SUB_CHANNEL:
-            yield from self.handle_sub_packet(client_id, payload)
+            yield from self.handle_sub_channel_packet(client_id, payload)
         if message_id == 5:
             msg = asynqp.Message({'pong': 'content'})
             self.exchange.publish(msg, 'gateway.pong')
@@ -69,39 +69,39 @@ class Router():
     def handle_register_packet(self, client_id):
         """Handle registration packet"""
         response = pack('B7sB', client_id, bytes(SERVER_ID), SERVER_ID_CHECKSUM)
-        self.clear_subscriptions(client_id)
+        self.clear_subscription_channels(client_id)
         if self.send_packet:
             yield from asyncio.sleep(0.02)
             self.send_packet(client_id, PacketTypes.REGISTER_SERVER_ACK, response)
 
     @asyncio.coroutine
-    def handle_sub_packet(self, client_id, payload):
+    def handle_sub_channel_packet(self, client_id, payload):
         """Handle packet for subscription to a routing key"""
         payload_size = len(payload)
         routing_key_length = str((payload_size-2))
         channel_id, transform_id = unpack('BB', payload[:2])
         routing_key = unpack(routing_key_length + 's', payload[2:])[0].decode('ascii')
-        yield from self.add_subscription(client_id, routing_key, channel_id, transform_id)
+        yield from self.add_subscription_channel(client_id, routing_key, channel_id, transform_id)
 
     @asyncio.coroutine
-    def add_subscription(self, client_id, routing_key, channel_id, transform_id):
+    def add_subscription_channel(self, client_id, routing_key, channel_id, transform_id):
         """Add subscription object so later messages can be routed correctly"""
         subscription = {
             'client_id': client_id,
             'channel_id': channel_id,
             'transform_id': transform_id
         }
-        if routing_key in self.subscriptions:
-            self.subscriptions[routing_key].append(subscription)
+        if routing_key in self.subscription_channels:
+            self.subscription_channels[routing_key].append(subscription)
         else:
-            self.subscriptions[routing_key] = [subscription]
+            self.subscription_channels[routing_key] = [subscription]
         yield from self.queue.bind(self.exchange, routing_key)
 
-    def clear_subscriptions(self, client_id):
+    def clear_subscription_channels(self, client_id):
         """Clear all subscriptions for a client after new registration"""
-        for routing_key in self.subscriptions:
-            subscriptions = self.subscriptions[routing_key]
-            self.subscriptions[routing_key] = [s for s in subscriptions if s['client_id'] != client_id]
+        for routing_key in self.subscription_channels:
+            subscriptions = self.subscription_channels[routing_key]
+            self.subscription_channels[routing_key] = [s for s in subscriptions if s['client_id'] != client_id]
 
     def handle_message(self, message):
         """Handle message coming from rabbitmq"""

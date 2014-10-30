@@ -59,7 +59,7 @@ class TestRouter(unittest.TestCase):
         expected_packet_id = 1
         expected_response = bytes([expected_client_id]) + bytes(MOCK_SERVER_ID) + bytes([MOCK_SERVER_CHECKSUM])
         router_instance = router.Router()
-        router_instance.clear_subscriptions = Mock()
+        router_instance.clear_subscription_channels = Mock()
         router_instance.set_send_packet(self.send_packet_stub)
 
         yield from router_instance.handle_packet(expected_client_id,
@@ -67,7 +67,7 @@ class TestRouter(unittest.TestCase):
                                                  payload)
 
         self.send_packet_stub.assert_called_once_with(expected_client_id, expected_packet_id, expected_response)
-        router_instance.clear_subscriptions.assert_called_once_with(expected_client_id)
+        router_instance.clear_subscription_channels.assert_called_once_with(expected_client_id)
 
     @setup_test.async_test
     def test_it_should_handle_a_subscription_packet(self):
@@ -78,13 +78,13 @@ class TestRouter(unittest.TestCase):
         payload = bytes([expected_channel_id, expected_transform_id]) + bytes(expected_routing_key, encoding='ascii')
         expected_client_id = random.randint(1, 255)
         router_instance = router.Router()
-        router_instance.add_subscription = Mock()
+        router_instance.add_subscription_channel = Mock()
 
         yield from router_instance.handle_packet(expected_client_id,
                                                  subscription_packet_id,
                                                  payload)
 
-        router_instance.add_subscription.assert_called_once_with(
+        router_instance.add_subscription_channel.assert_called_once_with(
             expected_client_id,
             expected_routing_key,
             expected_channel_id,
@@ -92,8 +92,8 @@ class TestRouter(unittest.TestCase):
         )
 
     @setup_test.async_test
-    def test_add_subscription_with_new_routing_key(self):
-        expected_subscriptions = {
+    def test_add_subscription_channel_with_new_routing_key(self):
+        expected_subscription_channels = {
             'foo.routing.key': [
                 {'client_id': 1, 'channel_id': 2, 'transform_id': 3}
             ]
@@ -102,19 +102,19 @@ class TestRouter(unittest.TestCase):
         router_instance = router.Router()
         router_instance.queue = Mock()
         router_instance.exchange = Mock()
-        yield from router_instance.add_subscription(1, 'foo.routing.key', 2, 3)
+        yield from router_instance.add_subscription_channel(1, 'foo.routing.key', 2, 3)
 
-        self.assertEqual(router_instance.subscriptions, expected_subscriptions)
+        self.assertEqual(router_instance.subscription_channels, expected_subscription_channels)
         router_instance.queue.bind.assert_called_once_with(router_instance.exchange, 'foo.routing.key')
 
     @setup_test.async_test
-    def test_add_subscription_with_existing_routing_key(self):
-        subscriptions_before = {
+    def test_add_subscription_channel_with_existing_routing_key(self):
+        subscription_channels_before = {
             'foo.routing.key': [
                 {'client_id': 0, 'channel_id': 0, 'transform_id': 0}
             ]
         }
-        expected_subscriptions = {
+        expected_subscription_channels = {
             'foo.routing.key': [
                 {'client_id': 0, 'channel_id': 0, 'transform_id': 0},
                 {'client_id': 1, 'channel_id': 2, 'transform_id': 3}
@@ -124,14 +124,14 @@ class TestRouter(unittest.TestCase):
         router_instance = router.Router()
         router_instance.queue = Mock()
         router_instance.exchange = Mock()
-        router_instance.subscriptions = subscriptions_before
-        yield from router_instance.add_subscription(1, 'foo.routing.key', 2, 3)
+        router_instance.subscription_channels = subscription_channels_before
+        yield from router_instance.add_subscription_channel(1, 'foo.routing.key', 2, 3)
 
-        self.assertEqual(router_instance.subscriptions, expected_subscriptions)
+        self.assertEqual(router_instance.subscription_channels, expected_subscription_channels)
         router_instance.queue.bind.assert_called_once_with(router_instance.exchange, 'foo.routing.key')
 
-    def test_clear_subscriptions(self):
-        subscriptions_before = {
+    def test_clear_subscription_channels(self):
+        subscription_channels_before = {
             'foo.routing.key': [
                 {'client_id': 0, 'channel_id': 0, 'transform_id': 0},
                 {'client_id': 1, 'channel_id': 1, 'transform_id': 1}
@@ -140,7 +140,7 @@ class TestRouter(unittest.TestCase):
                 {'client_id': 1, 'channel_id': 1, 'transform_id': 1}
             ]
         }
-        expected_subscriptions = {
+        expected_subscription_channels = {
             'foo.routing.key': [
                 {'client_id': 0, 'channel_id': 0, 'transform_id': 0}
             ],
@@ -148,10 +148,10 @@ class TestRouter(unittest.TestCase):
         }
 
         router_instance = router.Router()
-        router_instance.subscriptions = subscriptions_before
-        router_instance.clear_subscriptions(1)
+        router_instance.subscription_channels = subscription_channels_before
+        router_instance.clear_subscription_channels(1)
 
-        self.assertEqual(router_instance.subscriptions, expected_subscriptions)
+        self.assertEqual(router_instance.subscription_channels, expected_subscription_channels)
 
 
 
