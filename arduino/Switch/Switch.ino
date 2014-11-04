@@ -17,21 +17,21 @@ uint8_t publishChannel;
 unsigned long lastSend;
 int switchTransformId = 0;
 int outputPin = 5;
-int status = HIGH;
+int currentStatus = true;
 
 void setup() {
     Serial.begin(57600);
     ha.begin();
     randomSeed(analogRead(0));
     delay(100);
-    lastSend = millis();
+    lastSend = millis()- 10001;
     setSwitch();
 }
 
 void loop() {
     unsigned long now = millis();
 
-    if (now - lastSend > 1000) {
+    if (now - lastSend > 10000) {
         if (!ha.isRegistered()) {
             ha.registerWithGateway();
             registerChannels();
@@ -50,19 +50,24 @@ void registerChannels() {
 
 void publishGet() {
     char payload[1] = "";
-    bool on = (status == HIGH);
-    memcpy(&on, &payload[0], 1);
+    memcpy(&payload[0], &currentStatus, 1);
     ha.publish(publishChannel, payload, 1);
 }
 
 void handleSet(char* payload, uint8_t payloadSize) {
-    Serial.println("Handle Set");
-    bool on;
-    memcpy(&payload[0], &on, 1);
-    status = on ? HIGH : LOW;
+    currentStatus = payload[5] == 1;
+
+    Serial.print("Handle Set: ");
+    Serial.println(currentStatus);
+
     setSwitch();
+    publishGet();
 }
 
 void setSwitch() {
-    digitalWrite(outputPin, status);
+    if (currentStatus) {
+        digitalWrite(outputPin, HIGH);
+    } else {
+        digitalWrite(outputPin, LOW);
+    }
 }

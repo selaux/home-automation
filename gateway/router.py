@@ -57,7 +57,7 @@ class Router():
         )
         self.channel = yield from self.connection.open_channel()
         self.channel.set_return_handler(log_returned_message)
-        self.exchange = yield from self.channel.declare_exchange(EXCHANGE, 'fanout')
+        self.exchange = yield from self.channel.declare_exchange(EXCHANGE, 'topic')
         self.queue = yield from self.channel.declare_queue(QUEUE, auto_delete=True)
         self.consumer = yield from self.queue.consume(self.handle_message)
 
@@ -97,7 +97,7 @@ class Router():
     def handle_pub_channel_packet(self, client_id, payload):
         """Handle packet for creating a publish channel for a routing key"""
         routing_key, channel_id, transform_id = self.extract_channel_packet_data(payload)
-        yield from self.add_publish_channel(client_id, routing_key, channel_id, transform_id)
+        self.add_publish_channel(client_id, routing_key, channel_id, transform_id)
 
     @asyncio.coroutine
     def handle_sub_channel_packet(self, client_id, payload):
@@ -113,7 +113,7 @@ class Router():
             if channel:
                 transform = self.transforms[channel['transform_id']]
                 routing_key = channel['routing_key']
-                msg = asynqp.Message(transform.to_message(payload))
+                msg = asynqp.Message(transform.to_message(payload[1:]))
                 self.exchange.publish(msg, routing_key)
             else:
                 LOGGER.warning('Client {0} tried to publish message with unknown channel {1}'.format(
@@ -175,9 +175,14 @@ class Router():
             self.publish_channels.pop(client_id)
 
     def handle_message(self, message):
-        """Handle message coming from rabbitmq"""
-        response = pack('11s', bytes([0]) + bytes('Pong!', 'ascii'))
-        LOGGER.info("Receiving message %s", message.json())
-        if self.send_packet:
-            self.send_packet(1, PacketTypes.PUB, response)
-        message.ack()
+        """Handle message coming from rabbitmq and route them to the respective clients"""
+        routing_key = message.routing_key
+        json = message.json()
+        LOGGER.info("Receiving message %s %s", routing_key, json)
+        if routing_key in self.subscription_channels:
+            for channel in self.subscription_channels[routing_key]:
+                data = self.transforms[channel['transform_id']].to_packet(json)
+                channel_id = pack('B', channel['channel_id'])
+                payload = channel_id + data
+                if self.send_packet:
+                    self.send_packet(channel['client_id'], PacketTypes.PUB, payload)

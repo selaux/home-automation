@@ -2,7 +2,7 @@
 
 """All transforms from packets to dict and vice versa"""
 
-from struct import unpack
+from struct import pack, unpack
 
 class SwitchTransform:
     """Transform for a switch type client which just has a on/off state"""
@@ -13,3 +13,8 @@ class SwitchTransform:
         return {
             'status': status
         }
+
+    @staticmethod
+    def to_packet(obj):
+        """Use first byte of payload as the status"""
+        return pack('?', obj['status'])

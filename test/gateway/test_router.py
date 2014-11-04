@@ -148,6 +148,8 @@ class TestRouter(unittest.TestCase):
                                                  publish_packet_id,
                                                  payload)
 
+        transform_mock.to_message.assert_called_once_with(bytes([1, 2, 3, 4]))
+
         router_instance.exchange.publish.assert_called_once()
         message = router_instance.exchange.publish.call_args[0][0]
         routing_key = router_instance.exchange.publish.call_args[0][1]
@@ -343,5 +345,29 @@ class TestRouter(unittest.TestCase):
 
         self.assertEqual(router_instance.subscription_channels, expected_subscription_channels)
 
+    def test_handle_message(self):
+        transform_id_0 = random.randint(0, 255)
+        transform_id_1 = random.randint(0, 255)
+        channel_id_0 = random.randint(0, 255)
+        channel_id_1 = random.randint(0, 255)
+        message = Mock()
+        message.routing_key = 'some.routing.key'
+        message.json.return_value = 'JSON'
 
+        router_instance = router.Router()
+        router_instance.send_packet = Mock()
+        router_instance.transforms[transform_id_0] = Mock()
+        router_instance.transforms[transform_id_0].to_packet.return_value = bytes([1, 2, 3])
+        router_instance.transforms[transform_id_1] = Mock()
+        router_instance.transforms[transform_id_1].to_packet.return_value = bytes([4, 5, 6])
+        router_instance.subscription_channels['some.routing.key'] = [
+            {'client_id': 0, 'channel_id': channel_id_0, 'transform_id': transform_id_0},
+            {'client_id': 1, 'channel_id': channel_id_1, 'transform_id': transform_id_1}
+        ]
 
+        router_instance.handle_message(message)
+        router_instance.transforms[transform_id_0].to_packet.assert_called_once_with('JSON')
+        router_instance.transforms[transform_id_1].to_packet.assert_called_once_with('JSON')
+        self.assertEqual(router_instance.send_packet.call_count, 2)
+        router_instance.send_packet.assert_any_call(0, 4, bytes([channel_id_0, 1, 2, 3]))
+        router_instance.send_packet.assert_any_call(1, 4, bytes([channel_id_1, 4, 5, 6]))
