@@ -105,7 +105,7 @@ void HomeAutomation::poll() {
             uint8_t channel = received[4];
             uint8_t payloadSize = received[3];
             if (channel < currentHandlerListSize) {
-                (*this->subscriptionHandlers[channel])(received, payloadSize);
+                (*this->subscriptionHandlers[channel])(&received[5], payloadSize);
             }
         }
     }

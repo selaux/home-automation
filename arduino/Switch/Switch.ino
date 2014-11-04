@@ -55,7 +55,7 @@ void publishGet() {
 }
 
 void handleSet(char* payload, uint8_t payloadSize) {
-    currentStatus = payload[5] == 1;
+    currentStatus = payload[0] == 1;
 
     Serial.print("Handle Set: ");
     Serial.println(currentStatus);
