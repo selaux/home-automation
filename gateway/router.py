@@ -44,9 +44,9 @@ class Router():
     @asyncio.coroutine
     def connect_to_message_queue(self):
         """Connects to the amqp exchange and queue"""
-        def log_returned_message(dummy):
+        def log_returned_message(message):
             """Log when message has no handler in message queue"""
-            LOGGER.info("Nobody cared for {0}".format(dummy.json()))
+            LOGGER.info("Nobody cared for {0} {1}".format(message.routing_key, message.json()))
 
         self.connection = yield from asynqp.connect(
             RABBITMQ_HOST,
