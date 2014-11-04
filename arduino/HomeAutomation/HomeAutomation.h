@@ -18,8 +18,8 @@ class HomeAutomation
     bool registerWithGateway();
     bool isRegistered();
     void poll();
-    uint8_t subscribeChannel(char* routingKey, uint8_t routingKeyLength, uint8_t transformId, HandlerPointer handler);
-    uint8_t publishChannel(char* routingKey, uint8_t routingKeyLength, uint8_t transformId);
+    uint8_t subscribeChannel(char* routingKey, uint8_t transformId, HandlerPointer handler);
+    uint8_t publishChannel(char* routingKey, uint8_t transformId);
     bool publish(uint8_t channelId, char* payload, uint8_t payloadSize);
 
   private:

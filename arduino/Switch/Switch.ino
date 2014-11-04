@@ -34,7 +34,9 @@ void loop() {
     if (now - lastSend > 10000) {
         if (!ha.isRegistered()) {
             ha.registerWithGateway();
-            registerChannels();
+            if (ha.isRegistered()) {
+                registerChannels();
+            }
         }
         publishGet();
         lastSend = now;
@@ -44,8 +46,8 @@ void loop() {
 }
 
 void registerChannels() {
-    ha.subscribeChannel("switch1.set", 11, switchTransformId, &handleSet);
-    publishChannel = ha.publishChannel("switch1.get", 11, switchTransformId);
+    ha.subscribeChannel("switch1.set", switchTransformId, &handleSet);
+    publishChannel = ha.publishChannel("switch1.get", switchTransformId);
 }
 
 void publishGet() {

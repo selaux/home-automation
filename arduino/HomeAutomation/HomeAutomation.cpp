@@ -83,7 +83,7 @@ bool HomeAutomation::registerWithGateway() {
     }
 #ifdef HOMEAUTOMATION_DEBUG
         if (!registerSuccess) {
-            Serial.print("Failed;\n");
+            Serial.print("Register Failed;\n");
         }
     #endif
     this->registered = registerSuccess;
@@ -111,8 +111,9 @@ void HomeAutomation::poll() {
     }
 }
 
-uint8_t HomeAutomation::subscribeChannel(char* routingKey, uint8_t routingKeyLength, uint8_t transformId, HandlerPointer handler) {
+uint8_t HomeAutomation::subscribeChannel(char* routingKey, uint8_t transformId, HandlerPointer handler) {
     int handlerSize = sizeof(HandlerPointer);
+    uint8_t routingKeyLength = (uint8_t) strlen(routingKey);
     int channelId = this->subscriptionHandlers != NULL ? sizeof(this->subscriptionHandlers) / handlerSize : 0;
     char payload[32] = "";
     uint8_t payloadSize = routingKeyLength + 2;
@@ -148,8 +149,9 @@ uint8_t HomeAutomation::subscribeChannel(char* routingKey, uint8_t routingKeyLen
     return channelId;
 }
 
-uint8_t HomeAutomation::publishChannel(char* routingKey, uint8_t routingKeyLength, uint8_t transformId) {
+uint8_t HomeAutomation::publishChannel(char* routingKey, uint8_t transformId) {
     int channelId = this->numberOfPublishChannels;
+    uint8_t routingKeyLength = (uint8_t) strlen(routingKey);
     char payload[32] = "";
     uint8_t payloadSize = routingKeyLength + 2;
 
