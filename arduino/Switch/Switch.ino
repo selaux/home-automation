@@ -20,6 +20,7 @@ int outputPin = 5;
 int currentStatus = true;
 
 void setup() {
+    pinMode(outputPin, OUTPUT);
     Serial.begin(57600);
     ha.begin();
     randomSeed(analogRead(0));
