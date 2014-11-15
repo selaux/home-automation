@@ -67,9 +67,12 @@ class Radio():
         LOGGER.info("Sending packet type {0} to client {1}".format(packet_id, client_id))
 
         self.nrf24.stopListening()
-        self.nrf24.openReadingPipe(1, self.server_address)
         self.nrf24.openWritingPipe(address)
-        success = self.nrf24.write(encrypted)
+        success = False
+        retries = 10
+        while (not success) and retries != 0:
+            success = self.nrf24.write(encrypted)
+            retries -= 1
         self.nrf24.startListening()
         if not success:
             LOGGER.info("Failed sending packet!")

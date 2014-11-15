@@ -76,7 +76,7 @@ class TestRadio(unittest.TestCase):
 
     @patch.multiple(radio, NRF24=MockNRF24, SERVER_ADDRESS=MOCK_SERVER_ADDRESS)
     @patch.object(radio, 'encrypt_packet')
-    def test_send_packet_with_success(self, encrypt_mock):
+    def test_send_packet_with_eventual_success(self, encrypt_mock):
         expected_packet = [39, 0, 5, 4, 1, 2, 3, 4]
         expected_packet = bytes(expected_packet)
         encrypted_packet = bytes([8] * 32)
@@ -89,7 +89,7 @@ class TestRadio(unittest.TestCase):
         radio_instance.nrf24.openReadingPipe.reset_mock()
         radio_instance.nrf24.openWritingPipe.reset_mock()
         radio_instance.nrf24.startListening.reset_mock()
-        radio_instance.nrf24.write.return_value = True
+        radio_instance.nrf24.write.side_effect = [False, False, True]
         encrypt_mock.return_value = encrypted_packet
 
         success = radio_instance.send_packet(1, 5, bytes([1, 2, 3, 4]))
@@ -98,9 +98,8 @@ class TestRadio(unittest.TestCase):
         self.assertEqual(encrypt_mock.call_args[0][0][:len(expected_packet)], expected_packet)
         self.assertEqual(encrypt_mock.call_args[0][0][-1], 16)
         radio_instance.nrf24.stopListening.assert_called_once_with()
-        radio_instance.nrf24.openReadingPipe.assert_called_once_with(1, MOCK_SERVER_ADDRESS)
         radio_instance.nrf24.openWritingPipe.assert_called_once_with(MOCK_CLIENT_ADDRESS)
-        radio_instance.nrf24.write.assert_called_once_with(encrypted_packet)
+        self.assertEqual(radio_instance.nrf24.write.call_count, 3)
         radio_instance.nrf24.startListening.assert_called_once()
 
         self.assertEqual(success, True)
@@ -118,6 +117,7 @@ class TestRadio(unittest.TestCase):
         success = radio_instance.send_packet(1, 5, bytes([1, 2, 3, 4]))
 
         self.assertEqual(success, False)
+        self.assertEqual(radio_instance.nrf24.write.call_count, 10)
 
     def setup_for_test_get_packet(self):
         radio_instance = radio.Radio()

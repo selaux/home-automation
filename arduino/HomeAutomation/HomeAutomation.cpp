@@ -191,6 +191,7 @@ bool HomeAutomation::publish(uint8_t channelId, char* data, uint8_t dataSize) {
 }
 
 bool HomeAutomation::sendPacket(uint8_t type, char *payload, uint8_t payloadSize) {
+    uint8_t retries = 10;
     char data[32] = "";
     bool ackDataAvailable;
     char ackData[8] = "";
@@ -218,7 +219,10 @@ bool HomeAutomation::sendPacket(uint8_t type, char *payload, uint8_t payloadSize
     this->encryptPayload(data);
 
     this->radio->stopListening();
-    success = this->radio->write(&data, 32);
+    while (!success && retries != 0) {
+        success = this->radio->write(&data, 32);
+        retries -= 1;
+    }
     ackDataAvailable = this->radio->isAckPayloadAvailable();
 
     if (ackDataAvailable) {
