@@ -18,3 +18,19 @@ class SwitchTransform:
     def to_packet(obj):
         """Use first byte of payload as the status"""
         return pack('?', obj['status'])
+
+class TemperatureTransform:
+    """Transform for a temperature type client which has temperature, humidity and dewpoint"""
+    @staticmethod
+    def to_message(payload):
+        """Use first byte of payload as boolean"""
+        temperature, humidity = unpack('ff', payload[:8])
+        return {
+            'temperature': temperature,
+            'humidity': humidity
+        }
+
+    @staticmethod
+    def to_packet(obj):
+        """Use first byte of payload as the status"""
+        return pack('ff', obj['temperature'], obj['humidity'])

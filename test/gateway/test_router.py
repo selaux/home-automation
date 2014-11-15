@@ -20,7 +20,8 @@ class TestRouter(unittest.TestCase):
 
     def test_transform_registration(self):
         expected_transforms = {
-            0: transforms.SwitchTransform
+            0: transforms.SwitchTransform,
+            1: transforms.TemperatureTransform
         }
         router_instance = router.Router()
         self.assertEqual(router_instance.transforms, expected_transforms)

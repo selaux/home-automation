@@ -7,7 +7,7 @@ from crypto import xor_checksum
 from struct import pack, unpack
 from settings import SERVER_ID, RABBITMQ_HOST, RABBITMQ_PORT, RABBITMQ_USERNAME, RABBITMQ_PASSWORD, \
     RABBITMQ_VIRTUAL_HOST
-from transforms import SwitchTransform
+from transforms import SwitchTransform, TemperatureTransform
 from constants import PacketTypes
 
 SERVER_ID_CHECKSUM = xor_checksum(SERVER_ID)
@@ -32,6 +32,7 @@ class Router():
         self.publish_channels = {}
         self.transforms = {}
         self.register_transform(0, SwitchTransform)
+        self.register_transform(1, TemperatureTransform)
 
     def register_transform(self, transform_id, transform_class):
         """Register a new transform class with the gateway"""
